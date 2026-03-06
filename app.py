@@ -462,8 +462,8 @@ def local_search_advanced(y, best_cost, f, c, max_iter=10):
     n_coarse = len(coarse)
 
     def evaluate_bits(bits):
-    yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])  # <-- سطر واحد كامل
-    y_full = y1.copy()
+     yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])  # <-- سطر واحد كام
+            y_full = y1.copy()
     for idx, val in zip(coarse, yc):
         y_full[idx] = val
     cost = solve_lp_fixed_y_uflp(y_full, f, c)
