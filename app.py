@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 تطبيق AHRH المتكامل مع واجهة متعددة اللغات (عربي/إنجليزي/فرنسي)
-وتقنية التسريع التلقائي - نسخة مصححة بالكامل وجاهزة للنسخ
+وتقنية التسريع التلقائي وعرض التطور خلال كل دورة
 """
 
 import streamlit as st
@@ -20,7 +20,8 @@ NUM_WORKERS = 4
 # ------------------- ترجمة النصوص -------------------
 translations = {
     'العربية': {
-        'app_title': '🧠 AHRH: خوارزمية هرمية انكماشية متطورة',
+        'app_title': '🧠 AHRH: خوارزمية هرمية انكماشية
+         app_title': ' By  (BENREGREG ZAKARYA)',
         'app_desc': 'هذا التطبيق يطبق خوارزمية AHRH المتقدمة التي تجمع بين:',
         'feature1': 'المسح الشعاعي الهرمي مع اتجاهات موجهة',
         'feature2': 'الرفع الهرمي للاتجاهات',
@@ -232,10 +233,8 @@ translations = {
 }
 
 def t(key):
-    """دالة الترجمة"""
     return translations[st.session_state.language][key]
 
-# ------------------- إعداد اللغة -------------------
 if 'language' not in st.session_state:
     st.session_state.language = 'English'
 
@@ -312,7 +311,6 @@ def hierarchical_radial_scan_parallel(y_center, R, n_free, f, c, best_cost, best
             alpha_k = base_alpha * np.exp(- (layer - 1) / n_layers)
         else:
             alpha_k = (layer / n_layers) * base_alpha
-        # إذا كان وضع التسريع مفعلاً، نقلل عدد الاتجاهات
         if hasattr(st.session_state, 'acceleration') and st.session_state.acceleration:
             dirs_count = max(2, dirs_per_layer // 2)
         else:
@@ -536,7 +534,6 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
                         use_gap_repeat, gap_repeat_times,
                         use_contraction, diff_tol):
     n, m = len(f), c.shape[1]
-    # LP relaxation
     y_lp, lp_val = lp_relaxation_uflp(f, c)
     if lp_val is None:
         lp_val = float('inf')
@@ -553,7 +550,6 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
     stop_reason = ""
     acceleration_active = False
 
-    # عدادات التكرار
     cost_repeat_count = 0
     gap_repeat_count = 0
     stable_gap_count = 0
@@ -562,8 +558,12 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
     last_R = None
     last_y = y.copy()
 
+    # عناصر عرض التقدم
+    progress_bar = st.progress(0)
+    status_placeholder = st.empty()
+    cycle_counter = 0
+
     for cycle in range(max_cycles):
-        # اختيار المجموعة الخشنة
         if y_lp is not None:
             open_now = np.where(y > 0.5)[0].tolist()
             top_lp = np.argsort(-y_lp)[:k_coarse].tolist()
@@ -575,7 +575,6 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
         else:
             coarse = []
 
-        # تنفيذ دورة V-cycle
         if acceleration_active:
             st.session_state.acceleration = True
         else:
@@ -607,6 +606,17 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
             'best_so_far': best
         })
 
+        # تحديث واجهة التقدم
+        progress_bar.progress((cycle + 1) / max_cycles)
+        status_placeholder.info(
+            f"**Cycle {cycle+1}:**  "
+            f"Cost = {new_cost:,.2f}  |  "
+            f"Gap = {gap:.4f}%  |  "
+            f"R = {R_val:.6f}  |  "
+            f"Improved = {'✅' if improved else '❌'}  |  "
+            f"Best so far = {best:,.2f}"
+        )
+
         # تحديث حالة التسريع
         if not acceleration_active and gap < 2.0 and R_val < 0.01:
             acceleration_active = True
@@ -619,12 +629,10 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
         # معايير التوقف
         stop_now = False
 
-        # 1. Patience
         if no_improve >= patience:
             stop_reason = f"Patience ({patience} cycles without improvement)"
             stop_now = True
 
-        # 2. R + gap stability
         if not stop_now and use_R and R_val < R_tol:
             if last_gap is not None and abs(gap - last_gap) < 1e-6:
                 stable_gap_count += 1
@@ -634,7 +642,6 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
             else:
                 stable_gap_count = 0
 
-        # 3. Cost repetition
         if not stop_now and use_cost_repeat:
             if last_cost is not None and abs(new_cost - last_cost) < 1e-6:
                 cost_repeat_count += 1
@@ -644,7 +651,6 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
             else:
                 cost_repeat_count = 0
 
-        # 4. Gap repetition
         if not stop_now and use_gap_repeat:
             if last_gap is not None and abs(gap - last_gap) < 1e-6:
                 gap_repeat_count += 1
@@ -654,13 +660,11 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
             else:
                 gap_repeat_count = 0
 
-        # 5. Contraction (diff + R)
         if not stop_now and use_contraction:
             if diff < diff_tol and R_val < R_tol:
                 stop_reason = f"Contraction: diff < {diff_tol} and R < {R_tol}"
                 stop_now = True
 
-        # Update last values
         last_cost = new_cost
         last_gap = gap
         last_R = R_val
@@ -673,6 +677,10 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
     if cycles_done == 0:
         cycles_done = max_cycles
         stop_reason = f"Max cycles ({max_cycles}) reached"
+
+    # إزالة عناصر التقدم المؤقتة
+    progress_bar.empty()
+    status_placeholder.empty()
 
     if acceleration_active:
         st.info(t('acceleration_on'))
@@ -694,7 +702,6 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
 # ------------------- واجهة Streamlit -------------------
 st.set_page_config(page_title="AHRH Solver", layout="wide")
 
-# اختيار اللغة
 col1, col2 = st.columns([4, 1])
 with col2:
     language = st.selectbox("", ['English', 'Français', 'العربية'], key='language_selector')
@@ -704,7 +711,6 @@ st.title(t('app_title'))
 st.markdown(t('app_desc'))
 st.markdown(f"- {t('feature1')}\n- {t('feature2')}\n- {t('feature3')}\n- {t('feature4')}\n- {t('feature5')}\n- {t('feature6')}\n- {t('feature7')}")
 
-# Sidebar parameters
 with st.sidebar:
     st.header(t('sidebar_algo'))
     max_cycles = st.slider(t('max_cycles'), 5, 50, 15, 5)
@@ -742,7 +748,6 @@ with st.sidebar:
     st.markdown("---")
     st.write(f"{t('workers')}: {NUM_WORKERS}")
 
-# Tabs
 tab1, tab2, tab3 = st.tabs([t('tab_upload'), t('tab_random'), t('tab_manual')])
 
 with tab1:
@@ -846,7 +851,6 @@ with tab3:
             st.session_state['m'] = m_man
             st.success("Done!")
 
-# ------------------- Display results -------------------
 st.markdown("---")
 st.header(t('results'))
 
@@ -897,7 +901,6 @@ if 'result' in st.session_state:
         df_cycles[t('improved')] = df_cycles[t('improved')].apply(lambda x: t('yes') if x else t('no'))
         st.dataframe(df_cycles, use_container_width=True)
 
-        # Download data
         df = pd.DataFrame({
             t('cycle'): cycles,
             t('gap_label'): res['gap_history'],
