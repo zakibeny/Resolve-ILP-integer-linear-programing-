@@ -463,3 +463,8 @@ def vcycle(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
 
     def evaluate_bits(bits):
     yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])
+    y_full = y1.copy()
+    for idx, val in zip(coarse, yc):
+        y_full[idx] = val
+    cost = solve_lp_fixed_y_uflp(y_full, f, c)
+    return cost, y_full
