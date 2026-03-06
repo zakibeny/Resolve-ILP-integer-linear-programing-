@@ -3,7 +3,6 @@
 تطبيق AHRH المتكامل مع واجهة متعددة اللغات (عربي/إنجليزي/فرنسي)
 وتقنية التسريع التلقائي عند اقتراب الحل من الأمثلية
 """
-
 import streamlit as st
 import numpy as np
 import pulp
@@ -13,10 +12,8 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import warnings
 warnings.filterwarnings("ignore")
-
 # ------------------- إعدادات التوازي -------------------
 NUM_WORKERS = 4
-
 # ------------------- ترجمة النصوص -------------------
 translations = {
     'العربية': {
