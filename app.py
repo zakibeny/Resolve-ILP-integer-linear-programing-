@@ -448,20 +448,9 @@ def local_search_advanced(y, best_cost, f, c, max_iter=10):
                         if improved: break
                     if improved: break
                 if improved: break
-
         iteration += 1
-
     return best, best_y
-
-def vcycle(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
-    cost1, y1 = smooth(y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
-    if not coarse:
-        return cost1, y1
-    best = cost1
-    best_y = y1
-    n_coarse = len(coarse)
-
-    def evaluate_bits(bits):
+def evaluate_bits(bits):
     yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])
     y_full = y1.copy()
     for idx, val in zip(coarse, yc):
