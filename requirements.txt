@@ -1,5 +1,5 @@
 streamlit
 numpy
-pulp
+pulp==2.7.0
 matplotlib
 pandas
