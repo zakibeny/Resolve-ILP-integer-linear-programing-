@@ -11,8 +11,221 @@ warnings.filterwarnings("ignore")
 # ------------------- إعدادات التوازي -------------------
 NUM_WORKERS = 4
 
-# ===================== دوال الخوارزمية الأساسية =====================
+# ------------------- ترجمة النصوص -------------------
+translations = {
+    'العربية': {
+        'app_title': '🧠 AHRH: خوارزمية هرمية انكماشية متطورة',
+        'app_desc': 'هذا التطبيق يطبق خوارزمية AHRH المتقدمة التي تجمع بين:',
+        'feature1': 'المسح الشعاعي الهرمي مع اتجاهات موجهة',
+        'feature2': 'الرفع الهرمي للاتجاهات',
+        'feature3': 'إزاحة الاسترخاء الديناميكية',
+        'feature4': 'بحث محلي متقدم بأنماط تبادل متعددة (1-1، 2-1، 1-2، 2-2)',
+        'feature5': 'توازي الحسابات لتسريع الأداء',
+        'feature6': 'معايير توقف متعددة قابلة للاختيار',
+        'sidebar_algo': '⚙️ معاملات الخوارزمية',
+        'max_cycles': 'عدد الدورات الأقصى',
+        'k_coarse': 'حجم المجموعة الخشنة (k)',
+        'patience': 'الصبر (عدد الدورات بدون تحسن)',
+        'sidebar_stop': '⏹️ معايير التوقف',
+        'choose_criteria': 'اختر أي مجموعة من الشروط (عند تحقق أي منها تتوقف الخوارزمية):',
+        'use_R': 'استخدام عتبة R (مع استقرار الفجوة)',
+        'R_tol': 'قيمة R الصغرى (ε)',
+        'stable_gap': 'عدد دورات استقرار الفجوة المطلوبة',
+        'use_cost_repeat': 'استخدام تكرار التكلفة',
+        'cost_repeat_times': 'عدد مرات التكرار',
+        'use_gap_repeat': 'استخدام تكرار الفجوة',
+        'gap_repeat_times': 'عدد مرات التكرار للفجوة',
+        'use_contraction': 'استخدام معيار الانكماش (diff + R)',
+        'diff_tol': 'عتبة الفرق بين الحلول (ε₁)',
+        'workers': 'عدد العمال (للتوازي)',
+        'tab_upload': '📂 رفع ملف',
+        'tab_random': '🎲 توليد عشوائي',
+        'tab_manual': '✍️ إدخال يدوي',
+        'upload_header': 'رفع ملف المسألة',
+        'upload_info': 'يدعم أي ملف نصي (txt, dat, bub, opt, ...). يتم تجاهل الأسطر التي تبدأ بـ # أو ! أو FILE:',
+        'choose_file': 'اختر ملف المسألة',
+        'random_header': 'توليد مسألة عشوائية',
+        'random_n': 'عدد المواقع (n)',
+        'random_m': 'عدد العملاء (m)',
+        'random_button': '🎲 توليد وحل',
+        'manual_header': 'إدخال بيانات المسألة يدويًا',
+        'manual_warning': 'للمسائل الصغيرة فقط (n ≤ 10, m ≤ 10)',
+        'manual_n': 'عدد المواقع (n)',
+        'manual_m': 'عدد العملاء (m)',
+        'manual_f': 'تكاليف فتح المرافق f[i]',
+        'manual_c': 'تكاليف النقل c[i][j]',
+        'solve_button': '🚀 حل المسألة المدخلة',
+        'results': '📊 النتائج',
+        'best_cost': 'أفضل تكلفة',
+        'lp_val': 'قيمة LP',
+        'gap': 'الفجوة',
+        'open_fac': 'المرافق المفتوحة',
+        'cycles_done': 'عدد الدورات',
+        'time': 'الزمن (ث)',
+        'size': 'حجم المسألة',
+        'stop_reason': 'سبب التوقف',
+        'gap_plot': '📈 تطور الفجوة و R خلال الدورات',
+        'gap_label': 'الفجوة (%)',
+        'R_label': 'R',
+        'cycle_log': '📋 سجل الدورات',
+        'cycle': 'دورة',
+        'cost': 'التكلفة',
+        'improved': 'تحسن',
+        'best_so_far': 'أفضل حتى الآن',
+        'yes': 'نعم',
+        'no': 'لا',
+        'download': '📥 تحميل التطور (CSV)',
+        'info_placeholder': '👈 اختر مصدر المسألة من التبويبات أعلاه واضغط على زر التشغيل.',
+        'footer': 'تم التطوير بواسطة [اسمك] - خوارزمية AHRH محمية ببراءة اختراع.',
+        'optimal_achieved': '✅ الخوارزمية وصلت للحل الأمثل بالكامل!',
+        'optimal_diff': '⚠️ الفرق عن الحل الأمثل',
+        'problem_type': 'نوع المسألة',
+        'uflp': 'UFLP (تحديد مواقع المرافق)',
+        'ilp_general': 'ILP عام (قيد التطوير)'
+    },
+    'English': {
+        'app_title': '🧠 AHRH: Advanced Hierarchical Radial Heuristic',
+        'app_desc': 'This app implements the AHRH algorithm, combining:',
+        'feature1': 'Hierarchical radial scan with biased directions',
+        'feature2': 'Hierarchical direction lifting',
+        'feature3': 'Dynamic relaxation shift',
+        'feature4': 'Advanced local search (1-1, 2-1, 1-2, 2-2 swaps)',
+        'feature5': 'Parallel computing for speed',
+        'feature6': 'Multiple customizable stopping criteria',
+        'sidebar_algo': '⚙️ Algorithm Parameters',
+        'max_cycles': 'Max Cycles',
+        'k_coarse': 'Coarse Set Size (k)',
+        'patience': 'Patience (cycles without improvement)',
+        'sidebar_stop': '⏹️ Stopping Criteria',
+        'choose_criteria': 'Choose any combination (algorithm stops when any condition is met):',
+        'use_R': 'Use R threshold (with gap stability)',
+        'R_tol': 'R tolerance (ε)',
+        'stable_gap': 'Stable gap cycles required',
+        'use_cost_repeat': 'Use cost repetition',
+        'cost_repeat_times': 'Repetition count',
+        'use_gap_repeat': 'Use gap repetition',
+        'gap_repeat_times': 'Repetition count',
+        'use_contraction': 'Use contraction criterion (diff + R)',
+        'diff_tol': 'Solution difference tolerance (ε₁)',
+        'workers': 'Workers (parallel threads)',
+        'tab_upload': '📂 Upload File',
+        'tab_random': '🎲 Random Generation',
+        'tab_manual': '✍️ Manual Input',
+        'upload_header': 'Upload Problem File',
+        'upload_info': 'Accepts any text file (txt, dat, bub, opt, ...). Lines starting with #, !, or FILE: are ignored.',
+        'choose_file': 'Choose a file',
+        'random_header': 'Generate Random Instance',
+        'random_n': 'Number of facilities (n)',
+        'random_m': 'Number of customers (m)',
+        'random_button': '🎲 Generate and Solve',
+        'manual_header': 'Manual Data Entry',
+        'manual_warning': 'For small problems only (n ≤ 10, m ≤ 10)',
+        'manual_n': 'Number of facilities (n)',
+        'manual_m': 'Number of customers (m)',
+        'manual_f': 'Facility opening costs f[i]',
+        'manual_c': 'Transportation costs c[i][j]',
+        'solve_button': '🚀 Solve Entered Problem',
+        'results': '📊 Results',
+        'best_cost': 'Best Cost',
+        'lp_val': 'LP Value',
+        'gap': 'Gap',
+        'open_fac': 'Open Facilities',
+        'cycles_done': 'Cycles Done',
+        'time': 'Time (s)',
+        'size': 'Problem Size',
+        'stop_reason': 'Stop Reason',
+        'gap_plot': '📈 Gap & R Evolution',
+        'gap_label': 'Gap (%)',
+        'R_label': 'R',
+        'cycle_log': '📋 Cycle Log',
+        'cycle': 'Cycle',
+        'cost': 'Cost',
+        'improved': 'Improved?',
+        'best_so_far': 'Best so far',
+        'yes': 'Yes',
+        'no': 'No',
+        'download': '📥 Download Evolution (CSV)',
+        'info_placeholder': '👈 Choose a data source and click the run button.',
+        'footer': 'Developed by [Your Name] - AHRH algorithm patented.',
+        'optimal_achieved': '✅ Algorithm reached the optimal solution!',
+        'optimal_diff': '⚠️ Difference from optimal',
+        'problem_type': 'Problem Type',
+        'uflp': 'UFLP (Facility Location)',
+        'ilp_general': 'General ILP (under development)'
+    },
+    'Français': {
+        'app_title': '🧠 AHRH: Algorithme Hiérarchique Radial Contractant',
+        'app_desc': 'Cette application implémente l\'algorithme AHRH, combinant :',
+        'feature1': 'Balayage radial hiérarchique avec directions orientées',
+        'feature2': 'Relèvement hiérarchique des directions',
+        'feature3': 'Décalage dynamique de relaxation',
+        'feature4': 'Recherche locale avancée (échanges 1-1, 2-1, 1-2, 2-2)',
+        'feature5': 'Calcul parallèle pour la rapidité',
+        'feature6': 'Critères d\'arrêt multiples personnalisables',
+        'sidebar_algo': '⚙️ Paramètres de l\'algorithme',
+        'max_cycles': 'Cycles max',
+        'k_coarse': 'Taille de l\'ensemble grossier (k)',
+        'patience': 'Patience (cycles sans amélioration)',
+        'sidebar_stop': '⏹️ Critères d\'arrêt',
+        'choose_criteria': 'Choisissez une combinaison (l\'algorithme s\'arrête dès qu\'une condition est remplie) :',
+        'use_R': 'Utiliser le seuil R (avec stabilité du gap)',
+        'R_tol': 'Tolérance R (ε)',
+        'stable_gap': 'Cycles de stabilité du gap requis',
+        'use_cost_repeat': 'Utiliser la répétition du coût',
+        'cost_repeat_times': 'Nombre de répétitions',
+        'use_gap_repeat': 'Utiliser la répétition du gap',
+        'gap_repeat_times': 'Nombre de répétitions',
+        'use_contraction': 'Utiliser le critère de contraction (diff + R)',
+        'diff_tol': 'Tolérance de différence entre solutions (ε₁)',
+        'workers': 'Travailleurs (threads parallèles)',
+        'tab_upload': '📂 Télécharger un fichier',
+        'tab_random': '🎲 Génération aléatoire',
+        'tab_manual': '✍️ Saisie manuelle',
+        'upload_header': 'Télécharger le fichier problème',
+        'upload_info': 'Accepte tout fichier texte (txt, dat, bub, opt, ...). Les lignes commençant par #, ! ou FILE: sont ignorées.',
+        'choose_file': 'Choisir un fichier',
+        'random_header': 'Générer une instance aléatoire',
+        'random_n': 'Nombre de sites (n)',
+        'random_m': 'Nombre de clients (m)',
+        'random_button': '🎲 Générer et résoudre',
+        'manual_header': 'Saisie manuelle des données',
+        'manual_warning': 'Pour petits problèmes uniquement (n ≤ 10, m ≤ 10)',
+        'manual_n': 'Nombre de sites (n)',
+        'manual_m': 'Nombre de clients (m)',
+        'manual_f': 'Coûts d\'ouverture f[i]',
+        'manual_c': 'Coûts de transport c[i][j]',
+        'solve_button': '🚀 Résoudre le problème saisi',
+        'results': '📊 Résultats',
+        'best_cost': 'Meilleur coût',
+        'lp_val': 'Valeur LP',
+        'gap': 'Écart',
+        'open_fac': 'Sites ouverts',
+        'cycles_done': 'Cycles effectués',
+        'time': 'Temps (s)',
+        'size': 'Taille du problème',
+        'stop_reason': 'Raison de l\'arrêt',
+        'gap_plot': '📈 Évolution du gap et de R',
+        'gap_label': 'Écart (%)',
+        'R_label': 'R',
+        'cycle_log': '📋 Journal des cycles',
+        'cycle': 'Cycle',
+        'cost': 'Coût',
+        'improved': 'Amélioration ?',
+        'best_so_far': 'Meilleur jusqu\'à présent',
+        'yes': 'Oui',
+        'no': 'Non',
+        'download': '📥 Télécharger l\'évolution (CSV)',
+        'info_placeholder': '👈 Choisissez une source de données et cliquez sur le bouton.',
+        'footer': 'Développé par [Votre Nom] - Algorithme AHRH breveté.',
+        'optimal_achieved': '✅ L\'algorithme a atteint la solution optimale !',
+        'optimal_diff': '⚠️ Différence par rapport à l\'optimal',
+        'problem_type': 'Type de problème',
+        'uflp': 'UFLP (Localisation d\'installations)',
+        'ilp_general': 'ILP général (en développement)'
+    }
+}
 
+# ------------------- دوال الخوارزمية الأساسية -------------------
 def solve_lp_fixed_y_uflp(y_int, f, c):
     open_fac = np.where(y_int > 0.5)[0]
     if len(open_fac) == 0:
@@ -299,29 +512,40 @@ def generate_random_instance(n, m):
     c = np.random.uniform(100, 500, (n, m))
     return f, c
 
-def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience, stop_criteria):
+def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
+                        use_R, R_tol, stable_gap_needed,
+                        use_cost_repeat, cost_repeat_times,
+                        use_gap_repeat, gap_repeat_times,
+                        use_contraction, diff_tol):
     n, m = len(f), c.shape[1]
+    # LP relaxation
     y_lp, lp_val = lp_relaxation_uflp(f, c)
     if lp_val is None:
         lp_val = float('inf')
+
+    # Initial solution: all open
     y = np.ones(n, dtype=int)
     best = solve_lp_fixed_y_uflp(y, f, c)
+
     cycles_log = []
     gap_history = []
     R_history = []
-    cost_history = []
+    diff_history = []
     no_improve = 0
     cycles_done = 0
-    start_time = time.time()
     stop_reason = ""
 
-    # تكرارات التوقف
+    # Counters
     cost_repeat_count = 0
     gap_repeat_count = 0
+    stable_gap_count = 0
     last_cost = None
     last_gap = None
+    last_R = None
+    last_y = y.copy()
 
     for cycle in range(max_cycles):
+        # Choose coarse set
         if y_lp is not None:
             open_now = np.where(y > 0.5)[0].tolist()
             top_lp = np.argsort(-y_lp)[:k_coarse].tolist()
@@ -336,6 +560,7 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience, stop_criteria):
         new_cost, new_y = vcycle(y, f, c, coarse, y_lp=y_lp, gap_threshold=3.0)
         gap = (new_cost - lp_val) / lp_val * 100 if lp_val != float('inf') else 0
         R_val = compute_R(new_y)
+        diff = np.linalg.norm(new_y - last_y)
 
         improved = new_cost < best - 1e-6
         if improved:
@@ -345,53 +570,68 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience, stop_criteria):
         else:
             no_improve += 1
 
-        cost_history.append(new_cost)
         gap_history.append(gap)
         R_history.append(R_val)
+        diff_history.append(diff)
         cycles_log.append({
             'cycle': cycle+1,
             'cost': new_cost,
             'gap': gap,
             'R': R_val,
+            'diff': diff,
             'improved': improved,
             'best_so_far': best
         })
 
-        # ========== شروط التوقف ==========
+        # Stopping criteria
         stop_now = False
 
-        # شرط عدم التحسن (patience)
+        # 1. Patience
         if no_improve >= patience:
-            stop_reason = f"لم يتحسن لمدة {patience} دورات متتالية"
+            stop_reason = f"Patience ({patience} cycles without improvement)"
             stop_now = True
 
-        # شرط R
-        if not stop_now and stop_criteria.get('use_R', False):
-            if R_val < stop_criteria['R_tol']:
-                stop_reason = f"R أصغر من العتبة ({R_val:.2e} < {stop_criteria['R_tol']:.0e})"
-                stop_now = True
+        # 2. R + gap stability
+        if not stop_now and use_R and R_val < R_tol:
+            if last_gap is not None and abs(gap - last_gap) < 1e-6:
+                stable_gap_count += 1
+                if stable_gap_count >= stable_gap_needed:
+                    stop_reason = f"R < {R_tol} and gap stable for {stable_gap_needed} cycles"
+                    stop_now = True
+            else:
+                stable_gap_count = 0
 
-        # شرط تكرار التكلفة
-        if not stop_now and stop_criteria.get('use_cost_repeat', False):
+        # 3. Cost repetition
+        if not stop_now and use_cost_repeat:
             if last_cost is not None and abs(new_cost - last_cost) < 1e-6:
                 cost_repeat_count += 1
-                if cost_repeat_count >= stop_criteria['cost_repeat_times']:
-                    stop_reason = f"تكرار التكلفة ({stop_criteria['cost_repeat_times']} مرات)"
+                if cost_repeat_count >= cost_repeat_times:
+                    stop_reason = f"Cost repeated {cost_repeat_times} times"
                     stop_now = True
             else:
                 cost_repeat_count = 0
-            last_cost = new_cost
 
-        # شرط تكرار الفجوة
-        if not stop_now and stop_criteria.get('use_gap_repeat', False):
+        # 4. Gap repetition
+        if not stop_now and use_gap_repeat:
             if last_gap is not None and abs(gap - last_gap) < 1e-6:
                 gap_repeat_count += 1
-                if gap_repeat_count >= stop_criteria['gap_repeat_times']:
-                    stop_reason = f"تكرار الفجوة ({stop_criteria['gap_repeat_times']} مرات)"
+                if gap_repeat_count >= gap_repeat_times:
+                    stop_reason = f"Gap repeated {gap_repeat_times} times"
                     stop_now = True
             else:
                 gap_repeat_count = 0
-            last_gap = gap
+
+        # 5. Contraction (diff + R)
+        if not stop_now and use_contraction:
+            if diff < diff_tol and R_val < R_tol:
+                stop_reason = f"Contraction: diff < {diff_tol} and R < {R_tol}"
+                stop_now = True
+
+        # Update last values
+        last_cost = new_cost
+        last_gap = gap
+        last_R = R_val
+        last_y = new_y.copy()
 
         if stop_now:
             cycles_done = cycle + 1
@@ -399,9 +639,7 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience, stop_criteria):
 
     if cycles_done == 0:
         cycles_done = max_cycles
-        stop_reason = "الحد الأقصى للدورات"
-
-    total_time = time.time() - start_time
+        stop_reason = f"Max cycles ({max_cycles}) reached"
 
     return {
         'best_cost': best,
@@ -411,110 +649,126 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience, stop_criteria):
         'cycles_done': cycles_done,
         'gap_history': gap_history,
         'R_history': R_history,
-        'cost_history': cost_history,
-        'total_time': total_time,
+        'diff_history': diff_history,
         'cycles_log': cycles_log,
         'stop_reason': stop_reason
     }
 
-# ===================== واجهة Streamlit =====================
+# ------------------- Streamlit UI -------------------
 st.set_page_config(page_title="AHRH Solver", layout="wide")
-st.title("🧠 AHRH: خوارزمية هرمية انكماشية متطورة")
-st.markdown("""
-هذا التطبيق يطبق خوارزمية AHRH المتقدمة التي تجمع بين:
-- المسح الشعاعي الهرمي مع اتجاهات موجهة
-- الرفع الهرمي للاتجاهات
-- إزاحة الاسترخاء الديناميكية
-- بحث محلي متقدم بأنماط تبادل متعددة (1-1، 2-1، 1-2، 2-2)
-- توازي الحسابات لتسريع الأداء
-- **معايير توقف متعددة قابلة للاختيار**
-""")
 
-# الشريط الجانبي
+# Language selector
+col_lang = st.sidebar.columns(3)[1]
+with col_lang:
+    lang = st.selectbox("Language / اللغة / Langue", ['العربية', 'English', 'Français'], key='lang_selector')
+    st.session_state['language'] = lang
+
+def t(key):
+    return translations[st.session_state['language']][key]
+
+st.title(t('app_title'))
+st.markdown(t('app_desc'))
+st.markdown(f"- {t('feature1')}\n- {t('feature2')}\n- {t('feature3')}\n- {t('feature4')}\n- {t('feature5')}\n- {t('feature6')}")
+
+# Sidebar parameters
 with st.sidebar:
-    st.header("⚙️ معاملات الخوارزمية")
-    max_cycles = st.slider("عدد الدورات الأقصى", 5, 50, 15, 5)
-    k_coarse = st.slider("حجم المجموعة الخشنة (k)", 3, 10, 5)
-    patience = st.slider("الصبر (عدد الدورات بدون تحسن)", 2, 10, 3)
+    st.header(t('sidebar_algo'))
+    max_cycles = st.slider(t('max_cycles'), 5, 50, 15, 5)
+    k_coarse = st.slider(t('k_coarse'), 3, 10, 5)
+    patience = st.slider(t('patience'), 2, 10, 3)
 
-    st.header("⏹️ معايير التوقف")
-    st.markdown("اختر أي مجموعة من الشروط (عند تحقق أي منها تتوقف الخوارزمية):")
+    st.header(t('sidebar_stop'))
+    st.markdown(t('choose_criteria'))
 
-    use_R = st.checkbox("استخدام عتبة R", value=True)
-    R_tol = 1e-6
+    use_R = st.checkbox(t('use_R'), value=False)
     if use_R:
-        R_tol = st.number_input("قيمة R الصغرى (ε)", value=1e-6, format="%.0e", step=1e-6)
+        R_tol = st.number_input(t('R_tol'), value=1e-6, format="%.0e", step=1e-6)
+        stable_gap_needed = st.number_input(t('stable_gap'), min_value=1, max_value=5, value=2)
+    else:
+        R_tol, stable_gap_needed = 1e-6, 2
 
-    use_cost_repeat = st.checkbox("استخدام تكرار التكلفة", value=False)
-    cost_repeat_times = 2
+    use_cost_repeat = st.checkbox(t('use_cost_repeat'), value=False)
     if use_cost_repeat:
-        cost_repeat_times = st.number_input("عدد مرات التكرار", min_value=2, max_value=10, value=2)
+        cost_repeat_times = st.number_input(t('cost_repeat_times'), min_value=2, max_value=10, value=2)
+    else:
+        cost_repeat_times = 2
 
-    use_gap_repeat = st.checkbox("استخدام تكرار الفجوة", value=False)
-    gap_repeat_times = 2
+    use_gap_repeat = st.checkbox(t('use_gap_repeat'), value=False)
     if use_gap_repeat:
-        gap_repeat_times = st.number_input("عدد مرات التكرار للفجوة", min_value=2, max_value=10, value=2)
+        gap_repeat_times = st.number_input(t('gap_repeat_times'), min_value=2, max_value=10, value=2)
+    else:
+        gap_repeat_times = 2
+
+    use_contraction = st.checkbox(t('use_contraction'), value=True)
+    if use_contraction:
+        diff_tol = st.number_input(t('diff_tol'), value=1e-12, format="%.0e", step=1e-12)
+    else:
+        diff_tol = 1e-12
 
     st.markdown("---")
-    st.write(f"عدد العمال (للتوازي): {NUM_WORKERS}")
+    st.write(f"{t('workers')}: {NUM_WORKERS}")
 
-    # تجميع معايير التوقف في قاموس
-    stop_criteria = {
-        'use_R': use_R,
-        'R_tol': R_tol,
-        'use_cost_repeat': use_cost_repeat,
-        'cost_repeat_times': cost_repeat_times,
-        'use_gap_repeat': use_gap_repeat,
-        'gap_repeat_times': gap_repeat_times
-    }
-
-# تبويبات
-tab1, tab2, tab3 = st.tabs(["📂 رفع ملف", "🎲 توليد عشوائي", "✍️ إدخال يدوي"])
+# Tabs
+tab1, tab2, tab3 = st.tabs([t('tab_upload'), t('tab_random'), t('tab_manual')])
 
 with tab1:
-    st.header("رفع ملف المسألة")
-    st.info("يدعم أي ملف نصي (txt, dat, bub, opt, ...). يتم تجاهل الأسطر التي تبدأ بـ # أو ! أو FILE:")
-    uploaded_file = st.file_uploader("اختر ملف المسألة", type=None)
+    st.header(t('upload_header'))
+    st.info(t('upload_info'))
+    uploaded_file = st.file_uploader(t('choose_file'), type=None)
     if uploaded_file is not None:
-        with st.spinner("جاري قراءة الملف وتشغيل الخوارزمية..."):
+        with st.spinner("Reading file and running algorithm..."):
             try:
                 text = uploaded_file.getvalue().decode("utf-8")
             except:
                 text = uploaded_file.getvalue().decode("latin-1")
             try:
                 f, c, n, m = read_instance_from_text(text)
-                st.success(f"تم قراءة الملف بنجاح: {n} موقع، {m} عميل")
-                result = solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience, stop_criteria)
+                st.success(f"File loaded: {n} facilities, {m} customers")
+                result = solve_ahrh_with_log(
+                    f, c,
+                    max_cycles, k_coarse, patience,
+                    use_R, R_tol, stable_gap_needed,
+                    use_cost_repeat, cost_repeat_times,
+                    use_gap_repeat, gap_repeat_times,
+                    use_contraction, diff_tol
+                )
                 st.session_state['result'] = result
                 st.session_state['n'] = n
                 st.session_state['m'] = m
             except Exception as e:
-                st.error(f"خطأ في قراءة الملف: {e}")
+                st.error(f"Error reading file: {e}")
 
 with tab2:
-    st.header("توليد مسألة عشوائية")
+    st.header(t('random_header'))
     col1, col2 = st.columns(2)
     with col1:
-        n_rand = st.number_input("عدد المواقع (n)", min_value=5, max_value=200, value=50, step=5, key="n_rand")
+        n_rand = st.number_input(t('random_n'), min_value=5, max_value=200, value=50, step=5, key="n_rand")
     with col2:
-        m_rand = st.number_input("عدد العملاء (m)", min_value=5, max_value=200, value=50, step=5, key="m_rand")
-    if st.button("🎲 توليد وحل", key="gen_rand"):
-        with st.spinner("جاري توليد المسألة وتشغيل الخوارزمية..."):
+        m_rand = st.number_input(t('random_m'), min_value=5, max_value=200, value=50, step=5, key="m_rand")
+    if st.button(t('random_button'), key="gen_rand"):
+        with st.spinner("Generating and solving..."):
             f, c = generate_random_instance(int(n_rand), int(m_rand))
-            result = solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience, stop_criteria)
+            result = solve_ahrh_with_log(
+                f, c,
+                max_cycles, k_coarse, patience,
+                use_R, R_tol, stable_gap_needed,
+                use_cost_repeat, cost_repeat_times,
+                use_gap_repeat, gap_repeat_times,
+                use_contraction, diff_tol
+            )
             st.session_state['result'] = result
             st.session_state['n'] = n_rand
             st.session_state['m'] = m_rand
-            st.success("تم التوليد والحل بنجاح!")
+            st.success("Done!")
 
 with tab3:
-    st.header("إدخال بيانات المسألة يدويًا")
-    st.warning("للمسائل الصغيرة فقط (n ≤ 10, m ≤ 10)")
+    st.header(t('manual_header'))
+    st.warning(t('manual_warning'))
     col1, col2 = st.columns(2)
     with col1:
-        n_man = st.number_input("عدد المواقع (n)", min_value=1, max_value=10, value=3, step=1, key="n_man")
+        n_man = st.number_input(t('manual_n'), min_value=1, max_value=10, value=3, step=1, key="n_man")
     with col2:
-        m_man = st.number_input("عدد العملاء (m)", min_value=1, max_value=10, value=3, step=1, key="m_man")
+        m_man = st.number_input(t('manual_m'), min_value=1, max_value=10, value=3, step=1, key="m_man")
 
     if 'f_man' not in st.session_state or st.session_state.get('n_man_prev') != n_man:
         st.session_state['f_man'] = np.zeros(n_man)
@@ -523,7 +777,7 @@ with tab3:
         st.session_state['c_man'] = np.zeros((n_man, m_man))
         st.session_state['m_man_prev'] = m_man
 
-    st.subheader("تكاليف فتح المرافق f[i]")
+    st.subheader(t('manual_f'))
     f_vals = []
     cols = st.columns(min(5, n_man))
     for i in range(n_man):
@@ -532,10 +786,10 @@ with tab3:
             f_vals.append(val)
     st.session_state['f_man'] = np.array(f_vals)
 
-    st.subheader("تكاليف النقل c[i][j]")
+    st.subheader(t('manual_c'))
     c_vals = np.zeros((n_man, m_man))
     for i in range(n_man):
-        st.write(f"**الموقع {i}:**")
+        st.write(f"**{t('manual_c')} {i}:**")
         cols = st.columns(min(5, m_man))
         for j in range(m_man):
             with cols[j % 5]:
@@ -543,76 +797,85 @@ with tab3:
                 c_vals[i, j] = val
     st.session_state['c_man'] = c_vals
 
-    if st.button("🚀 حل المسألة المدخلة", key="solve_manual"):
-        with st.spinner("جاري تشغيل الخوارزمية..."):
-            result = solve_ahrh_with_log(st.session_state['f_man'], st.session_state['c_man'], max_cycles, k_coarse, patience, stop_criteria)
+    if st.button(t('solve_button'), key="solve_manual"):
+        with st.spinner("Running algorithm..."):
+            result = solve_ahrh_with_log(
+                st.session_state['f_man'], st.session_state['c_man'],
+                max_cycles, k_coarse, patience,
+                use_R, R_tol, stable_gap_needed,
+                use_cost_repeat, cost_repeat_times,
+                use_gap_repeat, gap_repeat_times,
+                use_contraction, diff_tol
+            )
             st.session_state['result'] = result
             st.session_state['n'] = n_man
             st.session_state['m'] = m_man
-            st.success("تم الحل بنجاح!")
+            st.success("Done!")
 
-# ------------------- عرض النتائج -------------------
+# ------------------- Display results -------------------
 st.markdown("---")
-st.header("📊 النتائج")
+st.header(t('results'))
 
 if 'result' in st.session_state:
     res = st.session_state['result']
     colA, colB, colC, colD = st.columns(4)
-    colA.metric("أفضل تكلفة", f"{res['best_cost']:,.0f}")
-    colB.metric("قيمة LP", f"{res['lp_val']:,.0f}")
-    colC.metric("الفجوة", f"{res['gap']:.4f}%")
-    colD.metric("المرافق المفتوحة", res['open_fac'])
+    colA.metric(t('best_cost'), f"{res['best_cost']:,.0f}")
+    colB.metric(t('lp_val'), f"{res['lp_val']:,.0f}")
+    colC.metric(t('gap'), f"{res['gap']:.4f}%")
+    colD.metric(t('open_fac'), res['open_fac'])
 
     colE, colF, colG = st.columns(3)
-    colE.metric("عدد الدورات", res['cycles_done'])
-    colF.metric("الزمن (ث)", f"{res['total_time']:.2f}")
-    colG.metric("حجم المسألة", f"{st.session_state['n']}×{st.session_state['m']}")
+    colE.metric(t('cycles_done'), res['cycles_done'])
+    colF.metric(t('time'), f"{res.get('total_time', 0):.2f}")
+    colG.metric(t('size'), f"{st.session_state['n']}×{st.session_state['m']}")
 
-    st.info(f"سبب التوقف: {res['stop_reason']}")
+    st.info(f"**{t('stop_reason')}:** {res['stop_reason']}")
 
     if res['gap_history']:
-        st.subheader("📈 تطور الفجوة و R خلال الدورات")
+        st.subheader(t('gap_plot'))
         fig, ax1 = plt.subplots(figsize=(10, 5))
         cycles = list(range(1, len(res['gap_history'])+1))
-        ax1.plot(cycles, res['gap_history'], 'b-o', label='Gap (%)')
-        ax1.set_xlabel("الدورة")
-        ax1.set_ylabel("الفجوة (%)", color='b')
+        ax1.plot(cycles, res['gap_history'], 'b-o', label=t('gap_label'))
+        ax1.set_xlabel(t('cycle'))
+        ax1.set_ylabel(t('gap_label'), color='b')
         ax1.tick_params(axis='y', labelcolor='b')
         ax2 = ax1.twinx()
-        ax2.plot(cycles, res['R_history'], 'r-s', label='R')
-        ax2.set_ylabel("R", color='r')
+        ax2.plot(cycles, res['R_history'], 'r-s', label=t('R_label'))
+        ax2.set_ylabel(t('R_label'), color='r')
         ax2.tick_params(axis='y', labelcolor='r')
-        plt.title("تطور الفجوة و R")
+        plt.title(t('gap_plot'))
         fig.tight_layout()
         st.pyplot(fig)
 
-        st.subheader("📋 سجل الدورات")
+        st.subheader(t('cycle_log'))
         df_cycles = pd.DataFrame(res['cycles_log'])
         df_cycles = df_cycles.rename(columns={
-            'cycle': 'دورة',
-            'cost': 'التكلفة',
-            'gap': 'الفجوة %',
+            'cycle': t('cycle'),
+            'cost': t('cost'),
+            'gap': t('gap'),
             'R': 'R',
-            'improved': 'تحسن',
-            'best_so_far': 'أفضل حتى الآن'
+            'diff': 'Diff',
+            'improved': t('improved'),
+            'best_so_far': t('best_so_far')
         })
+        df_cycles[t('improved')] = df_cycles[t('improved')].apply(lambda x: t('yes') if x else t('no'))
         st.dataframe(df_cycles, use_container_width=True)
 
-        # تحميل البيانات
+        # Download data
         df = pd.DataFrame({
-            "Cycle": cycles,
-            "Gap (%)": res['gap_history'],
-            "R": res['R_history']
+            t('cycle'): cycles,
+            t('gap_label'): res['gap_history'],
+            'R': res['R_history']
         })
         csv = df.to_csv(index=False)
         st.download_button(
-            label="📥 تحميل التطور (CSV)",
+            label=t('download'),
             data=csv,
             file_name="evolution.csv",
             mime="text/csv"
         )
 else:
-    st.info("👈 اختر مصدر المسألة من التبويبات أعلاه واضغط على زر التشغيل.")
+    st.info(t('info_placeholder'))
 
 st.markdown("---")
-st.caption("تم التطوير بواسطة [Zakarya Benregreg] - خوارزمية AHRH محمية ببراءة اختراع.")    
+st.caption(t('footer'))
