@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 تطبيق AHRH المتكامل مع واجهة متعددة اللغات (عربي/إنجليزي/فرنسي)
-وتقنية التسريع التلقائي - نسخة مصححة
+وتقنية التسريع التلقائي - نسخة مصححة بالكامل وجاهزة للنسخ
 """
 
 import streamlit as st
@@ -453,18 +453,13 @@ def local_search_advanced(y, best_cost, f, c, max_iter=10):
 
     return best, best_y
 
-    def vcycle(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
-      cost1, y1 = smooth(y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
+def vcycle(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
+    cost1, y1 = smooth(y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
     if not coarse:
-    return cost1, y1
+        return cost1, y1
     best = cost1
     best_y = y1
     n_coarse = len(coarse)
 
     def evaluate_bits(bits):
-     yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])  # <-- سطر واحد كام
-            y_full = y1.copy()
-    for idx, val in zip(coarse, yc):
-        y_full[idx] = val
-    cost = solve_lp_fixed_y_uflp(y_full, f, c)
-    return cost, y_full
+        yc = np.array([(bits >>
