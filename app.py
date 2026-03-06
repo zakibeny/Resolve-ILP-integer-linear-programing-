@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""
+تطبيق AHRH المتكامل مع واجهة متعددة اللغات (عربي/إنجليزي/فرنسي)
+وتقنية التسريع التلقائي عند اقتراب الحل من الأمثلية
+"""
+
 import streamlit as st
 import numpy as np
 import pulp
@@ -22,6 +28,7 @@ translations = {
         'feature4': 'بحث محلي متقدم بأنماط تبادل متعددة (1-1، 2-1، 1-2، 2-2)',
         'feature5': 'توازي الحسابات لتسريع الأداء',
         'feature6': 'معايير توقف متعددة قابلة للاختيار',
+        'feature7': 'وضع التسريع التلقائي عندما تقترب الفجوة من 2%',
         'sidebar_algo': '⚙️ معاملات الخوارزمية',
         'max_cycles': 'عدد الدورات الأقصى',
         'k_coarse': 'حجم المجموعة الخشنة (k)',
@@ -79,9 +86,8 @@ translations = {
         'footer': 'تم التطوير بواسطة [اسمك] - خوارزمية AHRH محمية ببراءة اختراع.',
         'optimal_achieved': '✅ الخوارزمية وصلت للحل الأمثل بالكامل!',
         'optimal_diff': '⚠️ الفرق عن الحل الأمثل',
-        'problem_type': 'نوع المسألة',
-        'uflp': 'UFLP (تحديد مواقع المرافق)',
-        'ilp_general': 'ILP عام (قيد التطوير)'
+        'acceleration_on': '⚡ وضع التسريع مُفعّل (فجوة < 2% و R < 0.01)',
+        'acceleration_off': 'وضع التسريع غير مُفعّل',
     },
     'English': {
         'app_title': '🧠 AHRH: Advanced Hierarchical Radial Heuristic',
@@ -92,6 +98,7 @@ translations = {
         'feature4': 'Advanced local search (1-1, 2-1, 1-2, 2-2 swaps)',
         'feature5': 'Parallel computing for speed',
         'feature6': 'Multiple customizable stopping criteria',
+        'feature7': 'Automatic acceleration mode when gap approaches 2%',
         'sidebar_algo': '⚙️ Algorithm Parameters',
         'max_cycles': 'Max Cycles',
         'k_coarse': 'Coarse Set Size (k)',
@@ -149,9 +156,8 @@ translations = {
         'footer': 'Developed by [Your Name] - AHRH algorithm patented.',
         'optimal_achieved': '✅ Algorithm reached the optimal solution!',
         'optimal_diff': '⚠️ Difference from optimal',
-        'problem_type': 'Problem Type',
-        'uflp': 'UFLP (Facility Location)',
-        'ilp_general': 'General ILP (under development)'
+        'acceleration_on': '⚡ Acceleration mode ON (gap < 2% and R < 0.01)',
+        'acceleration_off': 'Acceleration mode OFF',
     },
     'Français': {
         'app_title': '🧠 AHRH: Algorithme Hiérarchique Radial Contractant',
@@ -162,6 +168,7 @@ translations = {
         'feature4': 'Recherche locale avancée (échanges 1-1, 2-1, 1-2, 2-2)',
         'feature5': 'Calcul parallèle pour la rapidité',
         'feature6': 'Critères d\'arrêt multiples personnalisables',
+        'feature7': 'Mode accélération automatique lorsque le gap approche 2%',
         'sidebar_algo': '⚙️ Paramètres de l\'algorithme',
         'max_cycles': 'Cycles max',
         'k_coarse': 'Taille de l\'ensemble grossier (k)',
@@ -219,11 +226,18 @@ translations = {
         'footer': 'Développé par [Votre Nom] - Algorithme AHRH breveté.',
         'optimal_achieved': '✅ L\'algorithme a atteint la solution optimale !',
         'optimal_diff': '⚠️ Différence par rapport à l\'optimal',
-        'problem_type': 'Type de problème',
-        'uflp': 'UFLP (Localisation d\'installations)',
-        'ilp_general': 'ILP général (en développement)'
+        'acceleration_on': '⚡ Mode accélération ACTIVÉ (gap < 2% et R < 0.01)',
+        'acceleration_off': 'Mode accélération DÉSACTIVÉ',
     }
 }
+
+def t(key):
+    """دالة الترجمة"""
+    return translations[st.session_state.language][key]
+
+# ------------------- إعداد اللغة -------------------
+if 'language' not in st.session_state:
+    st.session_state.language = 'English'
 
 # ------------------- دوال الخوارزمية الأساسية -------------------
 def solve_lp_fixed_y_uflp(y_int, f, c):
@@ -298,7 +312,11 @@ def hierarchical_radial_scan_parallel(y_center, R, n_free, f, c, best_cost, best
             alpha_k = base_alpha * np.exp(- (layer - 1) / n_layers)
         else:
             alpha_k = (layer / n_layers) * base_alpha
-        dirs_count = max(3, dirs_per_layer // 2)
+        # إذا كان وضع التسريع مفعلاً، نقلل عدد الاتجاهات
+        if hasattr(st.session_state, 'acceleration') and st.session_state.acceleration:
+            dirs_count = max(2, dirs_per_layer // 2)
+        else:
+            dirs_count = max(3, dirs_per_layer // 2)
         dirs = generate_biased_directions(y_lp, frac_idx, dirs_count, alpha_k, bias_strength=0.5)
 
         def evaluate_direction(u):
@@ -444,438 +462,4 @@ def vcycle(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
     n_coarse = len(coarse)
 
     def evaluate_bits(bits):
-        yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])
-        y_full = y1.copy()
-        for idx, val in zip(coarse, yc):
-            y_full[idx] = val
-        cost = solve_lp_fixed_y_uflp(y_full, f, c)
-        return cost, y_full
-
-    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
-        futures = [executor.submit(evaluate_bits, bits) for bits in range(1 << n_coarse)]
-        for future in as_completed(futures):
-            cost, y_cand = future.result()
-            if cost < best:
-                best = cost
-                best_y = y_cand
-    cost2, y2 = smooth(best_y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
-    cost3, y3 = local_search_advanced(y2, cost2, f, c, max_iter=5)
-    return cost3, y3
-
-def read_instance_from_text(text):
-    lines = text.strip().splitlines()
-    clean_lines = []
-    for line in lines:
-        line = line.strip()
-        if line and not line.startswith('#') and not line.startswith('!') and not line.upper().startswith('FILE:'):
-            clean_lines.append(line)
-    if len(clean_lines) < 2:
-        raise ValueError("الملف لا يحتوي على بيانات كافية.")
-    n, m = None, None
-    data_start = -1
-    for idx, line in enumerate(clean_lines):
-        parts = line.split()
-        if len(parts) >= 2:
-            try:
-                n_cand = int(parts[0])
-                m_cand = int(parts[1])
-                if n_cand > 0 and m_cand > 0:
-                    n, m = n_cand, m_cand
-                    data_start = idx
-                    break
-            except:
-                continue
-    if n is None or m is None:
-        raise ValueError("لم يتم العثور على سطر صالح يحتوي على n و m.")
-    f = np.zeros(n, dtype=float)
-    c = np.zeros((n, m), dtype=float)
-    for i in range(n):
-        if data_start + 1 + i >= len(clean_lines):
-            raise ValueError(f"الملف لا يحتوي على {n} سطراً من البيانات.")
-        line = clean_lines[data_start + 1 + i]
-        parts = line.split()
-        if len(parts) == 1 + m:
-            f[i] = float(parts[0])
-            for j in range(m):
-                c[i, j] = float(parts[1 + j])
-        elif len(parts) >= 2 + m:
-            idx = int(parts[0]) - 1
-            f[idx] = float(parts[1])
-            for j in range(m):
-                c[idx, j] = float(parts[2 + j])
-        else:
-            raise ValueError(f"السطر {data_start+1+i+1} لا يحتوي على العدد المناسب من القيم.")
-    return f, c, n, m
-
-def generate_random_instance(n, m):
-    f = np.random.uniform(1000, 20000, n)
-    c = np.random.uniform(100, 500, (n, m))
-    return f, c
-
-def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
-                        use_R, R_tol, stable_gap_needed,
-                        use_cost_repeat, cost_repeat_times,
-                        use_gap_repeat, gap_repeat_times,
-                        use_contraction, diff_tol):
-    n, m = len(f), c.shape[1]
-    # LP relaxation
-    y_lp, lp_val = lp_relaxation_uflp(f, c)
-    if lp_val is None:
-        lp_val = float('inf')
-
-    # Initial solution: all open
-    y = np.ones(n, dtype=int)
-    best = solve_lp_fixed_y_uflp(y, f, c)
-
-    cycles_log = []
-    gap_history = []
-    R_history = []
-    diff_history = []
-    no_improve = 0
-    cycles_done = 0
-    stop_reason = ""
-
-    # Counters
-    cost_repeat_count = 0
-    gap_repeat_count = 0
-    stable_gap_count = 0
-    last_cost = None
-    last_gap = None
-    last_R = None
-    last_y = y.copy()
-
-    for cycle in range(max_cycles):
-        # Choose coarse set
-        if y_lp is not None:
-            open_now = np.where(y > 0.5)[0].tolist()
-            top_lp = np.argsort(-y_lp)[:k_coarse].tolist()
-            coarse = list(set(open_now + top_lp))
-            if len(coarse) > 10:
-                importance = [(i, y_lp[i]) for i in coarse]
-                importance.sort(key=lambda x: x[1], reverse=True)
-                coarse = [i for i, _ in importance[:10]]
-        else:
-            coarse = []
-
-        new_cost, new_y = vcycle(y, f, c, coarse, y_lp=y_lp, gap_threshold=3.0)
-        gap = (new_cost - lp_val) / lp_val * 100 if lp_val != float('inf') else 0
-        R_val = compute_R(new_y)
-        diff = np.linalg.norm(new_y - last_y)
-
-        improved = new_cost < best - 1e-6
-        if improved:
-            best = new_cost
-            y = new_y
-            no_improve = 0
-        else:
-            no_improve += 1
-
-        gap_history.append(gap)
-        R_history.append(R_val)
-        diff_history.append(diff)
-        cycles_log.append({
-            'cycle': cycle+1,
-            'cost': new_cost,
-            'gap': gap,
-            'R': R_val,
-            'diff': diff,
-            'improved': improved,
-            'best_so_far': best
-        })
-
-        # Stopping criteria
-        stop_now = False
-
-        # 1. Patience
-        if no_improve >= patience:
-            stop_reason = f"Patience ({patience} cycles without improvement)"
-            stop_now = True
-
-        # 2. R + gap stability
-        if not stop_now and use_R and R_val < R_tol:
-            if last_gap is not None and abs(gap - last_gap) < 1e-6:
-                stable_gap_count += 1
-                if stable_gap_count >= stable_gap_needed:
-                    stop_reason = f"R < {R_tol} and gap stable for {stable_gap_needed} cycles"
-                    stop_now = True
-            else:
-                stable_gap_count = 0
-
-        # 3. Cost repetition
-        if not stop_now and use_cost_repeat:
-            if last_cost is not None and abs(new_cost - last_cost) < 1e-6:
-                cost_repeat_count += 1
-                if cost_repeat_count >= cost_repeat_times:
-                    stop_reason = f"Cost repeated {cost_repeat_times} times"
-                    stop_now = True
-            else:
-                cost_repeat_count = 0
-
-        # 4. Gap repetition
-        if not stop_now and use_gap_repeat:
-            if last_gap is not None and abs(gap - last_gap) < 1e-6:
-                gap_repeat_count += 1
-                if gap_repeat_count >= gap_repeat_times:
-                    stop_reason = f"Gap repeated {gap_repeat_times} times"
-                    stop_now = True
-            else:
-                gap_repeat_count = 0
-
-        # 5. Contraction (diff + R)
-        if not stop_now and use_contraction:
-            if diff < diff_tol and R_val < R_tol:
-                stop_reason = f"Contraction: diff < {diff_tol} and R < {R_tol}"
-                stop_now = True
-
-        # Update last values
-        last_cost = new_cost
-        last_gap = gap
-        last_R = R_val
-        last_y = new_y.copy()
-
-        if stop_now:
-            cycles_done = cycle + 1
-            break
-
-    if cycles_done == 0:
-        cycles_done = max_cycles
-        stop_reason = f"Max cycles ({max_cycles}) reached"
-
-    return {
-        'best_cost': best,
-        'lp_val': lp_val,
-        'gap': (best - lp_val) / lp_val * 100 if lp_val != float('inf') else 0,
-        'open_fac': len(np.where(y > 0.5)[0]),
-        'cycles_done': cycles_done,
-        'gap_history': gap_history,
-        'R_history': R_history,
-        'diff_history': diff_history,
-        'cycles_log': cycles_log,
-        'stop_reason': stop_reason
-    }
-
-# ------------------- Streamlit UI -------------------
-st.set_page_config(page_title="AHRH Solver", layout="wide")
-
-# Language selector
-col_lang = st.sidebar.columns(3)[1]
-with col_lang:
-    lang = st.selectbox("Language / اللغة / Langue", ['العربية', 'English', 'Français'], key='lang_selector')
-    st.session_state['language'] = lang
-
-def t(key):
-    return translations[st.session_state['language']][key]
-
-st.title(t('app_title'))
-st.markdown(t('app_desc'))
-st.markdown(f"- {t('feature1')}\n- {t('feature2')}\n- {t('feature3')}\n- {t('feature4')}\n- {t('feature5')}\n- {t('feature6')}")
-
-# Sidebar parameters
-with st.sidebar:
-    st.header(t('sidebar_algo'))
-    max_cycles = st.slider(t('max_cycles'), 5, 50, 15, 5)
-    k_coarse = st.slider(t('k_coarse'), 3, 10, 5)
-    patience = st.slider(t('patience'), 2, 10, 3)
-
-    st.header(t('sidebar_stop'))
-    st.markdown(t('choose_criteria'))
-
-    use_R = st.checkbox(t('use_R'), value=False)
-    if use_R:
-        R_tol = st.number_input(t('R_tol'), value=1e-6, format="%.0e", step=1e-6)
-        stable_gap_needed = st.number_input(t('stable_gap'), min_value=1, max_value=5, value=2)
-    else:
-        R_tol, stable_gap_needed = 1e-6, 2
-
-    use_cost_repeat = st.checkbox(t('use_cost_repeat'), value=False)
-    if use_cost_repeat:
-        cost_repeat_times = st.number_input(t('cost_repeat_times'), min_value=2, max_value=10, value=2)
-    else:
-        cost_repeat_times = 2
-
-    use_gap_repeat = st.checkbox(t('use_gap_repeat'), value=False)
-    if use_gap_repeat:
-        gap_repeat_times = st.number_input(t('gap_repeat_times'), min_value=2, max_value=10, value=2)
-    else:
-        gap_repeat_times = 2
-
-    use_contraction = st.checkbox(t('use_contraction'), value=True)
-    if use_contraction:
-        diff_tol = st.number_input(t('diff_tol'), value=1e-12, format="%.0e", step=1e-12)
-    else:
-        diff_tol = 1e-12
-
-    st.markdown("---")
-    st.write(f"{t('workers')}: {NUM_WORKERS}")
-
-# Tabs
-tab1, tab2, tab3 = st.tabs([t('tab_upload'), t('tab_random'), t('tab_manual')])
-
-with tab1:
-    st.header(t('upload_header'))
-    st.info(t('upload_info'))
-    uploaded_file = st.file_uploader(t('choose_file'), type=None)
-    if uploaded_file is not None:
-        with st.spinner("Reading file and running algorithm..."):
-            try:
-                text = uploaded_file.getvalue().decode("utf-8")
-            except:
-                text = uploaded_file.getvalue().decode("latin-1")
-            try:
-                f, c, n, m = read_instance_from_text(text)
-                st.success(f"File loaded: {n} facilities, {m} customers")
-                result = solve_ahrh_with_log(
-                    f, c,
-                    max_cycles, k_coarse, patience,
-                    use_R, R_tol, stable_gap_needed,
-                    use_cost_repeat, cost_repeat_times,
-                    use_gap_repeat, gap_repeat_times,
-                    use_contraction, diff_tol
-                )
-                st.session_state['result'] = result
-                st.session_state['n'] = n
-                st.session_state['m'] = m
-            except Exception as e:
-                st.error(f"Error reading file: {e}")
-
-with tab2:
-    st.header(t('random_header'))
-    col1, col2 = st.columns(2)
-    with col1:
-        n_rand = st.number_input(t('random_n'), min_value=5, max_value=200, value=50, step=5, key="n_rand")
-    with col2:
-        m_rand = st.number_input(t('random_m'), min_value=5, max_value=200, value=50, step=5, key="m_rand")
-    if st.button(t('random_button'), key="gen_rand"):
-        with st.spinner("Generating and solving..."):
-            f, c = generate_random_instance(int(n_rand), int(m_rand))
-            result = solve_ahrh_with_log(
-                f, c,
-                max_cycles, k_coarse, patience,
-                use_R, R_tol, stable_gap_needed,
-                use_cost_repeat, cost_repeat_times,
-                use_gap_repeat, gap_repeat_times,
-                use_contraction, diff_tol
-            )
-            st.session_state['result'] = result
-            st.session_state['n'] = n_rand
-            st.session_state['m'] = m_rand
-            st.success("Done!")
-
-with tab3:
-    st.header(t('manual_header'))
-    st.warning(t('manual_warning'))
-    col1, col2 = st.columns(2)
-    with col1:
-        n_man = st.number_input(t('manual_n'), min_value=1, max_value=10, value=3, step=1, key="n_man")
-    with col2:
-        m_man = st.number_input(t('manual_m'), min_value=1, max_value=10, value=3, step=1, key="m_man")
-
-    if 'f_man' not in st.session_state or st.session_state.get('n_man_prev') != n_man:
-        st.session_state['f_man'] = np.zeros(n_man)
-        st.session_state['n_man_prev'] = n_man
-    if 'c_man' not in st.session_state or st.session_state.get('n_man_prev') != n_man or st.session_state.get('m_man_prev') != m_man:
-        st.session_state['c_man'] = np.zeros((n_man, m_man))
-        st.session_state['m_man_prev'] = m_man
-
-    st.subheader(t('manual_f'))
-    f_vals = []
-    cols = st.columns(min(5, n_man))
-    for i in range(n_man):
-        with cols[i % 5]:
-            val = st.number_input(f"f[{i}]", value=float(st.session_state['f_man'][i]), key=f"f_man_{i}")
-            f_vals.append(val)
-    st.session_state['f_man'] = np.array(f_vals)
-
-    st.subheader(t('manual_c'))
-    c_vals = np.zeros((n_man, m_man))
-    for i in range(n_man):
-        st.write(f"**{t('manual_c')} {i}:**")
-        cols = st.columns(min(5, m_man))
-        for j in range(m_man):
-            with cols[j % 5]:
-                val = st.number_input(f"c[{i}][{j}]", value=float(st.session_state['c_man'][i, j]), key=f"c_man_{i}_{j}")
-                c_vals[i, j] = val
-    st.session_state['c_man'] = c_vals
-
-    if st.button(t('solve_button'), key="solve_manual"):
-        with st.spinner("Running algorithm..."):
-            result = solve_ahrh_with_log(
-                st.session_state['f_man'], st.session_state['c_man'],
-                max_cycles, k_coarse, patience,
-                use_R, R_tol, stable_gap_needed,
-                use_cost_repeat, cost_repeat_times,
-                use_gap_repeat, gap_repeat_times,
-                use_contraction, diff_tol
-            )
-            st.session_state['result'] = result
-            st.session_state['n'] = n_man
-            st.session_state['m'] = m_man
-            st.success("Done!")
-
-# ------------------- Display results -------------------
-st.markdown("---")
-st.header(t('results'))
-
-if 'result' in st.session_state:
-    res = st.session_state['result']
-    colA, colB, colC, colD = st.columns(4)
-    colA.metric(t('best_cost'), f"{res['best_cost']:,.0f}")
-    colB.metric(t('lp_val'), f"{res['lp_val']:,.0f}")
-    colC.metric(t('gap'), f"{res['gap']:.4f}%")
-    colD.metric(t('open_fac'), res['open_fac'])
-
-    colE, colF, colG = st.columns(3)
-    colE.metric(t('cycles_done'), res['cycles_done'])
-    colF.metric(t('time'), f"{res.get('total_time', 0):.2f}")
-    colG.metric(t('size'), f"{st.session_state['n']}×{st.session_state['m']}")
-
-    st.info(f"**{t('stop_reason')}:** {res['stop_reason']}")
-
-    if res['gap_history']:
-        st.subheader(t('gap_plot'))
-        fig, ax1 = plt.subplots(figsize=(10, 5))
-        cycles = list(range(1, len(res['gap_history'])+1))
-        ax1.plot(cycles, res['gap_history'], 'b-o', label=t('gap_label'))
-        ax1.set_xlabel(t('cycle'))
-        ax1.set_ylabel(t('gap_label'), color='b')
-        ax1.tick_params(axis='y', labelcolor='b')
-        ax2 = ax1.twinx()
-        ax2.plot(cycles, res['R_history'], 'r-s', label=t('R_label'))
-        ax2.set_ylabel(t('R_label'), color='r')
-        ax2.tick_params(axis='y', labelcolor='r')
-        plt.title(t('gap_plot'))
-        fig.tight_layout()
-        st.pyplot(fig)
-
-        st.subheader(t('cycle_log'))
-        df_cycles = pd.DataFrame(res['cycles_log'])
-        df_cycles = df_cycles.rename(columns={
-            'cycle': t('cycle'),
-            'cost': t('cost'),
-            'gap': t('gap'),
-            'R': 'R',
-            'diff': 'Diff',
-            'improved': t('improved'),
-            'best_so_far': t('best_so_far')
-        })
-        df_cycles[t('improved')] = df_cycles[t('improved')].apply(lambda x: t('yes') if x else t('no'))
-        st.dataframe(df_cycles, use_container_width=True)
-
-        # Download data
-        df = pd.DataFrame({
-            t('cycle'): cycles,
-            t('gap_label'): res['gap_history'],
-            'R': res['R_history']
-        })
-        csv = df.to_csv(index=False)
-        st.download_button(
-            label=t('download'),
-            data=csv,
-            file_name="evolution.csv",
-            mime="text/csv"
-        )
-else:
-    st.info(t('info_placeholder'))
-
-st.markdown("---")
-st.caption(t('footer'))
+        yc = np.array([(bits >> i) & 
