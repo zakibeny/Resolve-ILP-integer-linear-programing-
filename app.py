@@ -453,7 +453,7 @@ def local_search_advanced(y, best_cost, f, c, max_iter=10):
 
     return best, best_y
 
-  def vcycle(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
+    def vcycle(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
       cost1, y1 = smooth(y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
     if not coarse:
     return cost1, y1
