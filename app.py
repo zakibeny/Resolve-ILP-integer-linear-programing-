@@ -462,4 +462,4 @@ def vcycle(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
     n_coarse = len(coarse)
 
     def evaluate_bits(bits):
-        yc = np.array([(bits >> i) & 
+    yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])
