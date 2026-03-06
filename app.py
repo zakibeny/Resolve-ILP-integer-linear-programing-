@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 تطبيق AHRH المتكامل مع واجهة متعددة اللغات (عربي/إنجليزي/فرنسي)
-وتقنية التسريع التلقائي عند اقتراب الحل من الأمثلية
+وتقنية التسريع التلقائي - نسخة مصححة
 """
+
 import streamlit as st
 import numpy as np
 import pulp
@@ -12,8 +13,10 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import warnings
 warnings.filterwarnings("ignore")
+
 # ------------------- إعدادات التوازي -------------------
 NUM_WORKERS = 4
+
 # ------------------- ترجمة النصوص -------------------
 translations = {
     'العربية': {
@@ -445,12 +448,18 @@ def local_search_advanced(y, best_cost, f, c, max_iter=10):
                         if improved: break
                     if improved: break
                 if improved: break
+
         iteration += 1
+
     return best, best_y
-def evaluate_bits(bits):
-    yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])
-    y_full = y1.copy()
-    for idx, val in zip(coarse, yc):
-        y_full[idx] = val
-    cost = solve_lp_fixed_y_uflp(y_full, f, c)
-    return cost, y_full
+
+def vcycle(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
+    cost1, y1 = smooth(y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
+    if not coarse:
+        return cost1, y1
+    best = cost1
+    best_y = y1
+    n_coarse = len(coarse)
+
+    def evaluate_bits(bits):
+        yc = np.array([(bits >> i) & 1 for i in rang
