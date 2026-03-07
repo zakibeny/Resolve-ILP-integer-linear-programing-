@@ -1,20 +1,10 @@
-# -*- coding: utf-8 -*-
+       # -*- coding: utf-8 -*-
 """
 تطبيق AHRH الكامل مع معلومات الاتصال باللون الأحمر وبحجم كبير
 وجميع الوظائف السابقة (عرض التقدم، معايير التوقف، اللغات، التوازي)
+نسخة نهائية بدون أخطاء
 """
-def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
-                        use_R, R_tol, stable_gap_needed,
-                        use_cost_repeat, cost_repeat_times,
-                        use_gap_repeat, gap_repeat_times,
-                        use_contraction, diff_tol):
-    # بعد قراءة f, c
-    st.write("f[:5]:", f[:5])
-    st.write("c[:5, :5]:", c[:5, :5])
-    # بقية الكود
-print("c[:5, :5]:", c[:5, :5])
-print("LP value:", lp_val)
-print("Initial cost (all open):", best)
+
 import streamlit as st
 import numpy as np
 import pulp
@@ -552,6 +542,13 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
     y_lp, lp_val = lp_relaxation_uflp(f, c)
     if lp_val is None:
         lp_val = float('inf')
+    
+    # عرض معلومات تشخيصية للمساعدة في التحقق من صحة البيانات
+    with st.expander("معلومات تشخيصية (للتحقق من صحة البيانات)"):
+        st.write("**أول 5 قيم من f:**", f[:5])
+        st.write("**أول 5×5 من c:**")
+        st.dataframe(pd.DataFrame(c[:5, :5]))
+        st.write("**قيمة LP:**", lp_val)
 
     y = np.ones(n, dtype=int)
     best = solve_lp_fixed_y_uflp(y, f, c)
