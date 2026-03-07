@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-تطبيق AHRH لحل مسائل UFLP فقط
+تطبيق AHRH لحل مسائل البرمجة الصحيحة (ILP) و UFLP
 مع واجهة متعددة اللغات، عرض التقدم، معايير توقف متعددة، وإرسال التعليقات إلى GitHub Issues
-(نسخة مبسطة ومخصصة لـ UFLP - تم إزالة LP العام)
+تم تعديله ليشمل:
+- إزالة time.sleep لزيادة السرعة
+- عرض زمن كل دورة والزمن الكلي
+- واجهة إدخال يدوي محسنة باستخدام جداول قابلة للتعديل (data_editor)
+- زيادة max_cycles إلى 100
 """
 
 import streamlit as st
@@ -38,6 +42,9 @@ translations = {
         'feature5': 'توازي الحسابات لتسريع الأداء',
         'feature6': 'معايير توقف متعددة قابلة للاختيار',
         'feature7': 'وضع التسريع التلقائي عندما تقترب الفجوة من 2%',
+        'problem_type': 'نوع المسألة',
+        'ilp': 'برمجة خطية صحيحة عامة (ILP)',
+        'uflp': 'مسألة مواقع المرافق (UFLP)',
         'sidebar_algo': '⚙️ معاملات الخوارزمية',
         'max_cycles': 'عدد الدورات الأقصى',
         'k_coarse': 'حجم المجموعة الخشنة (k)',
@@ -58,18 +65,38 @@ translations = {
         'tab_random': '🎲 توليد عشوائي',
         'tab_manual': '✍️ إدخال يدوي',
         'upload_header': 'رفع ملف المسألة',
-        'upload_info': 'يدعم ملفات UFLP بصيغة OR-Library (txt, dat, bub, opt, ...). يتم تجاهل الأسطر التي تبدأ بـ # أو ! أو FILE:',
+        'upload_info': 'يدعم ملفات UFLP (مثل gs250) والملفات العامة بصيغة ILP.',
         'choose_file': 'اختر ملف المسألة',
-        'random_header': 'توليد مسألة UFLP عشوائية',
-        'random_n': 'عدد المواقع (n)',
-        'random_m': 'عدد العملاء (m)',
+        'file_type': 'نوع الملف',
+        'uflp_file': 'ملف UFLP (n m 0 + بيانات)',
+        'ilp_file': 'ملف ILP عام (n m + c + A + b)',
+        'ilp_format_help': """
+**تنسيق ملف ILP العام:**
+- السطر الأول: `n m` (عدد المتغيرات، عدد القيود)
+- السطر الثاني: معاملات الهدف c (n قيمة)
+- ثم m سطر: مصفوفة القيود A (كل سطر n قيمة)
+- السطر الأخير: الطرف الأيمن b (m قيمة)
+""",
+        'uflp_format_help': """
+**تنسيق ملف UFLP:**
+- السطر الأول: `n m 0` (عدد المواقع، عدد العملاء)
+- ثم n سطر: `رقم الموقع` `تكلفة الفتح` `تكاليف النقل إلى m عميل`
+""",
+        'random_header': 'توليد مسألة عشوائية',
+        'random_n': 'عدد المتغيرات (n)',
+        'random_m': 'عدد القيود (m)',
         'random_button': '🎲 توليد وحل',
         'manual_header': 'إدخال بيانات المسألة يدويًا',
         'manual_warning': 'للمسائل الصغيرة فقط (n ≤ 10, m ≤ 10)',
-        'manual_n': 'عدد المواقع (n)',
-        'manual_m': 'عدد العملاء (m)',
-        'manual_f': 'تكاليف فتح المرافق f[i]',
-        'manual_c': 'تكاليف النقل c[i][j]',
+        'manual_n': 'عدد المتغيرات (n)',
+        'manual_m': 'عدد القيود (m)',
+        'manual_c': 'معاملات الهدف c[i]',
+        'manual_A': 'مصفوفة القيود A[i][j]',
+        'manual_b': 'الطرف الأيمن b[i]',
+        'manual_f': 'تكاليف الفتح f[i]',
+        'manual_costs': 'تكاليف النقل c[i][j]',
+        'manual_example_button': '📋 تحميل مثال',
+        'manual_fill_example': 'تم تحميل المثال، يمكنك تعديل القيم.',
         'solve_button': '🚀 حل المسألة المدخلة',
         'results': '📊 النتائج',
         'best_cost': 'أفضل تكلفة',
@@ -113,6 +140,9 @@ translations = {
         'feature5': 'Parallel computing for speed',
         'feature6': 'Multiple customizable stopping criteria',
         'feature7': 'Automatic acceleration mode when gap approaches 2%',
+        'problem_type': 'Problem Type',
+        'ilp': 'General Integer Programming (ILP)',
+        'uflp': 'Facility Location (UFLP)',
         'sidebar_algo': '⚙️ Algorithm Parameters',
         'max_cycles': 'Max Cycles',
         'k_coarse': 'Coarse Set Size (k)',
@@ -132,19 +162,39 @@ translations = {
         'tab_upload': '📂 Upload File',
         'tab_random': '🎲 Random Generation',
         'tab_manual': '✍️ Manual Input',
-        'upload_header': 'Upload UFLP Problem File',
-        'upload_info': 'Accepts UFLP files in OR-Library format (txt, dat, bub, opt, ...). Lines starting with #, !, or FILE: are ignored.',
+        'upload_header': 'Upload Problem File',
+        'upload_info': 'Supports UFLP files (e.g., gs250) and general ILP files.',
         'choose_file': 'Choose a file',
-        'random_header': 'Generate Random UFLP Instance',
-        'random_n': 'Number of facilities (n)',
-        'random_m': 'Number of customers (m)',
+        'file_type': 'File Type',
+        'uflp_file': 'UFLP file (n m 0 + data)',
+        'ilp_file': 'General ILP file (n m + c + A + b)',
+        'ilp_format_help': """
+**General ILP File Format:**
+- First line: `n m` (number of variables, number of constraints)
+- Second line: objective coefficients c (n values)
+- Then m lines: constraint matrix A (n values per line)
+- Last line: right-hand side b (m values)
+""",
+        'uflp_format_help': """
+**UFLP File Format:**
+- First line: `n m 0` (number of facilities, number of customers)
+- Then n lines: `facility_index` `opening_cost` `transport_costs to m customers`
+""",
+        'random_header': 'Generate Random Instance',
+        'random_n': 'Number of variables (n)',
+        'random_m': 'Number of constraints (m)',
         'random_button': '🎲 Generate and Solve',
         'manual_header': 'Manual Data Entry',
         'manual_warning': 'For small problems only (n ≤ 10, m ≤ 10)',
-        'manual_n': 'Number of facilities (n)',
-        'manual_m': 'Number of customers (m)',
-        'manual_f': 'Facility opening costs f[i]',
-        'manual_c': 'Transportation costs c[i][j]',
+        'manual_n': 'Number of variables (n)',
+        'manual_m': 'Number of constraints (m)',
+        'manual_c': 'Objective coefficients c[i]',
+        'manual_A': 'Constraint matrix A[i][j]',
+        'manual_b': 'Right-hand side b[i]',
+        'manual_f': 'Opening costs f[i]',
+        'manual_costs': 'Transport costs c[i][j]',
+        'manual_example_button': '📋 Load Example',
+        'manual_fill_example': 'Example loaded. You can edit the values.',
         'solve_button': '🚀 Solve Entered Problem',
         'results': '📊 Results',
         'best_cost': 'Best Cost',
@@ -188,6 +238,9 @@ translations = {
         'feature5': 'Calcul parallèle pour la rapidité',
         'feature6': 'Critères d\'arrêt multiples personnalisables',
         'feature7': 'Mode accélération automatique lorsque le gap approche 2%',
+        'problem_type': 'Type de problème',
+        'ilp': 'Programmation en nombres entiers générale (ILP)',
+        'uflp': 'Localisation d\'installations (UFLP)',
         'sidebar_algo': '⚙️ Paramètres de l\'algorithme',
         'max_cycles': 'Cycles max',
         'k_coarse': 'Taille de l\'ensemble grossier (k)',
@@ -207,19 +260,39 @@ translations = {
         'tab_upload': '📂 Télécharger un fichier',
         'tab_random': '🎲 Génération aléatoire',
         'tab_manual': '✍️ Saisie manuelle',
-        'upload_header': 'Télécharger un fichier UFLP',
-        'upload_info': 'Accepte les fichiers UFLP au format OR-Library (txt, dat, bub, opt, ...). Les lignes commençant par #, ! ou FILE: sont ignorées.',
+        'upload_header': 'Télécharger le fichier problème',
+        'upload_info': 'Accepte les fichiers UFLP (ex. gs250) et les fichiers ILP généraux.',
         'choose_file': 'Choisir un fichier',
-        'random_header': 'Générer une instance UFLP aléatoire',
-        'random_n': 'Nombre de sites (n)',
-        'random_m': 'Nombre de clients (m)',
+        'file_type': 'Type de fichier',
+        'uflp_file': 'Fichier UFLP (n m 0 + données)',
+        'ilp_file': 'Fichier ILP général (n m + c + A + b)',
+        'ilp_format_help': """
+**Format du fichier ILP général :**
+- Première ligne : `n m` (nombre de variables, nombre de contraintes)
+- Deuxième ligne : coefficients objectifs c (n valeurs)
+- Ensuite m lignes : matrice des contraintes A (n valeurs par ligne)
+- Dernière ligne : second membre b (m valeurs)
+""",
+        'uflp_format_help': """
+**Format du fichier UFLP :**
+- Première ligne : `n m 0` (nombre de sites, nombre de clients)
+- Ensuite n lignes : `indice_site` `coût_ouverture` `coûts_transport vers m clients`
+""",
+        'random_header': 'Générer une instance aléatoire',
+        'random_n': 'Nombre de variables (n)',
+        'random_m': 'Nombre de contraintes (m)',
         'random_button': '🎲 Générer et résoudre',
         'manual_header': 'Saisie manuelle des données',
         'manual_warning': 'Pour petits problèmes uniquement (n ≤ 10, m ≤ 10)',
-        'manual_n': 'Nombre de sites (n)',
-        'manual_m': 'Nombre de clients (m)',
+        'manual_n': 'Nombre de variables (n)',
+        'manual_m': 'Nombre de contraintes (m)',
+        'manual_c': 'Coefficients objectifs c[i]',
+        'manual_A': 'Matrice des contraintes A[i][j]',
+        'manual_b': 'Second membre b[i]',
         'manual_f': 'Coûts d\'ouverture f[i]',
-        'manual_c': 'Coûts de transport c[i][j]',
+        'manual_costs': 'Coûts de transport c[i][j]',
+        'manual_example_button': '📋 Charger un exemple',
+        'manual_fill_example': 'Exemple chargé, vous pouvez modifier les valeurs.',
         'solve_button': '🚀 Résoudre le problème saisi',
         'results': '📊 Résultats',
         'best_cost': 'Meilleur coût',
@@ -261,7 +334,35 @@ def t(key):
 if 'language' not in st.session_state:
     st.session_state.language = 'English'
 
-# ------------------- دوال UFLP (النسخة القديمة) -------------------
+# ------------------- دوال أساسية مشتركة -------------------
+def get_fractional_indices(y, eps=0.01):
+    return np.where((y > eps) & (y < 1 - eps))[0]
+
+def compute_R(y):
+    return np.max(np.minimum(np.abs(y), np.abs(1 - y)))
+
+def generate_biased_directions(y_lp, frac_idx, count, alpha, bias_strength=0.5):
+    n_free = len(frac_idx)
+    if y_lp is None or n_free == 0:
+        dirs = np.random.randn(count, max(1, n_free))
+        dirs = dirs / (np.linalg.norm(dirs, axis=1, keepdims=True) + 1e-12)
+        return dirs
+    y_frac_target = np.clip(y_lp[frac_idx], 0, 1)
+    base_dir = y_frac_target - 0.5
+    if np.linalg.norm(base_dir) > 0:
+        base_dir = base_dir / np.linalg.norm(base_dir)
+    else:
+        base_dir = np.zeros(n_free)
+    dirs = []
+    for _ in range(count):
+        rand = np.random.randn(n_free)
+        rand = rand / (np.linalg.norm(rand) + 1e-12)
+        u = bias_strength * base_dir + (1 - bias_strength) * rand
+        u = u / (np.linalg.norm(u) + 1e-12)
+        dirs.append(u)
+    return np.array(dirs)
+
+# ------------------- دوال خاصة بـ UFLP -------------------
 def solve_lp_fixed_y_uflp(y_int, f, c):
     open_fac = np.where(y_int > 0.5)[0]
     if len(open_fac) == 0:
@@ -290,36 +391,61 @@ def lp_relaxation_uflp(f, c):
         return y_val, obj
     return None, None
 
-def get_fractional_indices(y, eps=0.01):
-    return np.where((y > eps) & (y < 1 - eps))[0]
+def vcycle_uflp(y, f, c, coarse, y_lp=None, gap_threshold=5.0, executor=None):
+    cost1, y1 = smooth_uflp(y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold, executor=executor)
+    if not coarse:
+        return cost1, y1
+    best = cost1
+    best_y = y1
+    n_coarse = len(coarse)
 
-def compute_R(y):
-    return np.max(np.minimum(np.abs(y), np.abs(1 - y)))
+    def evaluate_bits(bits):
+        yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])
+        y_full = y1.copy()
+        for idx, val in zip(coarse, yc):
+            y_full[idx] = val
+        cost = solve_lp_fixed_y_uflp(y_full, f, c)
+        return cost, y_full
 
-def generate_biased_directions(y_lp, frac_idx, count, alpha, bias_strength=0.5):
-    n_free = len(frac_idx)
-    if y_lp is None or n_free == 0:
-        dirs = np.random.randn(count, max(1, n_free))
-        dirs = dirs / (np.linalg.norm(dirs, axis=1, keepdims=True) + 1e-12)
-        return dirs
-    y_frac_target = np.clip(y_lp[frac_idx], 0, 1)
-    base_dir = y_frac_target - 0.5
-    if np.linalg.norm(base_dir) > 0:
-        base_dir = base_dir / np.linalg.norm(base_dir)
+    if executor:
+        futures = [executor.submit(evaluate_bits, bits) for bits in range(1 << n_coarse)]
+        for future in as_completed(futures):
+            cost, y_cand = future.result()
+            if cost < best:
+                best = cost
+                best_y = y_cand
     else:
-        base_dir = np.zeros(n_free)
-    dirs = []
-    for _ in range(count):
-        rand = np.random.randn(n_free)
-        rand = rand / (np.linalg.norm(rand) + 1e-12)
-        u = bias_strength * base_dir + (1 - bias_strength) * rand
-        u = u / (np.linalg.norm(u) + 1e-12)
-        dirs.append(u)
-    return np.array(dirs)
+        for bits in range(1 << n_coarse):
+            cost, y_cand = evaluate_bits(bits)
+            if cost < best:
+                best = cost
+                best_y = y_cand
 
-def hierarchical_radial_scan_parallel(y_center, R, n_free, f, c, best_cost, best_y,
-                                      n_layers=2, dirs_per_layer=10, alpha_schedule='adaptive',
-                                      y_lp=None, gap_threshold=5.0):
+    cost2, y2 = smooth_uflp(best_y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold, executor=executor)
+    cost3, y3 = local_search_advanced_uflp(y2, cost2, f, c, max_iter=5)
+    return cost3, y3
+
+def smooth_uflp(y, f, c, y_lp=None, iters=1, gap_threshold=5.0, executor=None):
+    best = solve_lp_fixed_y_uflp(y, f, c)
+    best_y = y.copy()
+    for _ in range(iters):
+        R_val = compute_R(y)
+        n_free = len(get_fractional_indices(y))
+        new_cost, new_y = hierarchical_radial_scan_parallel_uflp(
+            y, R_val, n_free, f, c, best, best_y,
+            n_layers=2, dirs_per_layer=8, alpha_schedule='adaptive',
+            y_lp=y_lp, gap_threshold=gap_threshold, executor=executor
+        )
+        if new_cost < best:
+            best = new_cost
+            best_y = new_y
+        else:
+            break
+    return best, best_y
+
+def hierarchical_radial_scan_parallel_uflp(y_center, R, n_free, f, c, best_cost, best_y,
+                                          n_layers=2, dirs_per_layer=10, alpha_schedule='adaptive',
+                                          y_lp=None, gap_threshold=5.0, executor=None):
     frac_idx = get_fractional_indices(y_center)
     if len(frac_idx) == 0:
         return best_cost, best_y
@@ -355,36 +481,25 @@ def hierarchical_radial_scan_parallel(y_center, R, n_free, f, c, best_cost, best
                     best_loc_y = y_int.copy()
             return best_loc, best_loc_y
 
-        with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        if executor:
             futures = [executor.submit(evaluate_direction, dirs[i]) for i in range(dirs_count)]
             for future in as_completed(futures):
                 cost, y_cand = future.result()
                 if cost < local_best:
                     local_best = cost
                     local_best_y = y_cand
+        else:
+            for i in range(dirs_count):
+                cost, y_cand = evaluate_direction(dirs[i])
+                if cost < local_best:
+                    local_best = cost
+                    local_best_y = y_cand
+
         y_center = local_best_y.copy()
         y_frac = y_center[frac_idx].copy()
     return local_best, local_best_y
 
-def smooth(y, f, c, y_lp=None, iters=1, gap_threshold=5.0):
-    best = solve_lp_fixed_y_uflp(y, f, c)
-    best_y = y.copy()
-    for _ in range(iters):
-        R_val = compute_R(y)
-        n_free = len(get_fractional_indices(y))
-        new_cost, new_y = hierarchical_radial_scan_parallel(
-            y, R_val, n_free, f, c, best, best_y,
-            n_layers=2, dirs_per_layer=8, alpha_schedule='adaptive',
-            y_lp=y_lp, gap_threshold=gap_threshold
-        )
-        if new_cost < best:
-            best = new_cost
-            best_y = new_y
-        else:
-            break
-    return best, best_y
-
-def local_search_advanced(y, best_cost, f, c, max_iter=10):
+def local_search_advanced_uflp(y, best_cost, f, c, max_iter=10):
     n = len(f)
     improved = True
     iteration = 0
@@ -474,33 +589,6 @@ def local_search_advanced(y, best_cost, f, c, max_iter=10):
 
     return best, best_y
 
-def vcycle(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
-    cost1, y1 = smooth(y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
-    if not coarse:
-        return cost1, y1
-    best = cost1
-    best_y = y1
-    n_coarse = len(coarse)
-
-    def evaluate_bits(bits):
-        yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])
-        y_full = y1.copy()
-        for idx, val in zip(coarse, yc):
-            y_full[idx] = val
-        cost = solve_lp_fixed_y_uflp(y_full, f, c)
-        return cost, y_full
-
-    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
-        futures = [executor.submit(evaluate_bits, bits) for bits in range(1 << n_coarse)]
-        for future in as_completed(futures):
-            cost, y_cand = future.result()
-            if cost < best:
-                best = cost
-                best_y = y_cand
-    cost2, y2 = smooth(best_y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
-    cost3, y3 = local_search_advanced(y2, cost2, f, c, max_iter=5)
-    return cost3, y3
-
 def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
                     use_R, R_tol, stable_gap_needed,
                     use_cost_repeat, cost_repeat_times,
@@ -535,115 +623,127 @@ def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
     status_placeholder = st.empty()
     details_placeholder = st.empty()
     start_time = time.time()
+    total_time = 0.0
 
-    for cycle in range(max_cycles):
-        if y_lp is not None:
-            open_now = np.where(y > 0.5)[0].tolist()
-            top_lp = np.argsort(-y_lp)[:k_coarse].tolist()
-            coarse = list(set(open_now + top_lp))
-            if len(coarse) > 10:
-                importance = [(i, y_lp[i]) for i in coarse]
-                importance.sort(key=lambda x: x[1], reverse=True)
-                coarse = [i for i, _ in importance[:10]]
-        else:
-            coarse = []
+    # استخدام executor واحد لجميع الدورات
+    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        for cycle in range(max_cycles):
+            cycle_start = time.time()
 
-        if acceleration_active:
-            st.session_state.acceleration = True
-        else:
-            st.session_state.acceleration = False
-
-        new_cost, new_y = vcycle(y, f, c, coarse, y_lp=y_lp, gap_threshold=3.0)
-        gap = (new_cost - lp_val) / lp_val * 100 if lp_val != float('inf') else 0
-        R_val = compute_R(new_y)
-        diff = np.linalg.norm(new_y - last_y)
-
-        improved = new_cost < best - 1e-6
-        if improved:
-            best = new_cost
-            y = new_y
-            no_improve = 0
-        else:
-            no_improve += 1
-
-        gap_history.append(gap)
-        R_history.append(R_val)
-        diff_history.append(diff)
-        cycles_log.append({
-            'cycle': cycle+1,
-            'cost': new_cost,
-            'gap': gap,
-            'R': R_val,
-            'diff': diff,
-            'improved': improved,
-            'best_so_far': best
-        })
-
-        progress_bar.progress((cycle + 1) / max_cycles)
-        status_placeholder.info(f"**Cycle {cycle+1} / {max_cycles}**")
-        details_placeholder.markdown(
-            f"**Current cost:** {new_cost:,.2f}  \n"
-            f"**Gap:** {gap:.4f}%  \n"
-            f"**R:** {R_val:.6f}  \n"
-            f"**Improved:** {'✅' if improved else '❌'}  \n"
-            f"**Best so far:** {best:,.2f}"
-        )
-        time.sleep(0.1)
-
-        if not acceleration_active and gap < 2.0 and R_val < 0.01:
-            acceleration_active = True
-            st.session_state.acceleration = True
-            st.info(t('acceleration_on'))
-        elif acceleration_active and (gap >= 2.0 or R_val >= 0.01):
-            acceleration_active = False
-            st.session_state.acceleration = False
-
-        stop_now = False
-
-        if no_improve >= patience:
-            stop_reason = f"Patience ({patience} cycles without improvement)"
-            stop_now = True
-
-        if not stop_now and use_R and R_val < R_tol:
-            if last_gap is not None and abs(gap - last_gap) < 1e-6:
-                stable_gap_count += 1
-                if stable_gap_count >= stable_gap_needed:
-                    stop_reason = f"R < {R_tol} and gap stable for {stable_gap_needed} cycles"
-                    stop_now = True
+            if y_lp is not None:
+                open_now = np.where(y > 0.5)[0].tolist()
+                top_lp = np.argsort(-y_lp)[:k_coarse].tolist()
+                coarse = list(set(open_now + top_lp))
+                if len(coarse) > 10:
+                    importance = [(i, y_lp[i]) for i in coarse]
+                    importance.sort(key=lambda x: x[1], reverse=True)
+                    coarse = [i for i, _ in importance[:10]]
             else:
-                stable_gap_count = 0
+                coarse = []
 
-        if not stop_now and use_cost_repeat:
-            if last_cost is not None and abs(new_cost - last_cost) < 1e-6:
-                cost_repeat_count += 1
-                if cost_repeat_count >= cost_repeat_times:
-                    stop_reason = f"Cost repeated {cost_repeat_times} times"
-                    stop_now = True
+            if acceleration_active:
+                st.session_state.acceleration = True
             else:
-                cost_repeat_count = 0
+                st.session_state.acceleration = False
 
-        if not stop_now and use_gap_repeat:
-            if last_gap is not None and abs(gap - last_gap) < 1e-6:
-                gap_repeat_count += 1
-                if gap_repeat_count >= gap_repeat_times:
-                    stop_reason = f"Gap repeated {gap_repeat_times} times"
-                    stop_now = True
+            new_cost, new_y = vcycle_uflp(y, f, c, coarse, y_lp=y_lp, gap_threshold=3.0, executor=executor)
+            gap = (new_cost - lp_val) / lp_val * 100 if lp_val != float('inf') else 0
+            R_val = compute_R(new_y)
+            diff = np.linalg.norm(new_y - last_y)
+
+            improved = new_cost < best - 1e-6
+            if improved:
+                best = new_cost
+                y = new_y
+                no_improve = 0
             else:
-                gap_repeat_count = 0
+                no_improve += 1
 
-        if not stop_now and use_contraction:
-            if diff < diff_tol and R_val < R_tol:
-                stop_reason = f"Contraction: diff < {diff_tol} and R < {R_tol}"
+            cycle_time = time.time() - cycle_start
+            total_time = time.time() - start_time
+
+            gap_history.append(gap)
+            R_history.append(R_val)
+            diff_history.append(diff)
+            cycles_log.append({
+                'cycle': cycle+1,
+                'cost': new_cost,
+                'gap': gap,
+                'R': R_val,
+                'diff': diff,
+                'improved': improved,
+                'best_so_far': best,
+                'cycle_time': cycle_time,
+                'total_time': total_time
+            })
+
+            progress_bar.progress((cycle + 1) / max_cycles)
+            status_placeholder.info(f"**Cycle {cycle+1} / {max_cycles}**")
+            details_placeholder.markdown(
+                f"**Current cost:** {new_cost:,.2f}  \n"
+                f"**Gap:** {gap:.4f}%  \n"
+                f"**R:** {R_val:.6f}  \n"
+                f"**Cycle time:** {cycle_time:.3f} s  \n"
+                f"**Total time:** {total_time:.2f} s  \n"
+                f"**Improved:** {'✅' if improved else '❌'}  \n"
+                f"**Best so far:** {best:,.2f}"
+            )
+            # تمت إزالة time.sleep
+
+            if not acceleration_active and gap < 2.0 and R_val < 0.01:
+                acceleration_active = True
+                st.session_state.acceleration = True
+                st.info(t('acceleration_on'))
+            elif acceleration_active and (gap >= 2.0 or R_val >= 0.01):
+                acceleration_active = False
+                st.session_state.acceleration = False
+
+            stop_now = False
+
+            if no_improve >= patience:
+                stop_reason = f"Patience ({patience} cycles without improvement)"
                 stop_now = True
 
-        last_cost = new_cost
-        last_gap = gap
-        last_R = R_val
-        last_y = new_y.copy()
+            if not stop_now and use_R and R_val < R_tol:
+                if last_gap is not None and abs(gap - last_gap) < 1e-6:
+                    stable_gap_count += 1
+                    if stable_gap_count >= stable_gap_needed:
+                        stop_reason = f"R < {R_tol} and gap stable for {stable_gap_needed} cycles"
+                        stop_now = True
+                else:
+                    stable_gap_count = 0
 
-        if stop_now:
-            cycles_done = cycle + 1
-            break
+            if not stop_now and use_cost_repeat:
+                if last_cost is not None and abs(new_cost - last_cost) < 1e-6:
+                    cost_repeat_count += 1
+                    if cost_repeat_count >= cost_repeat_times:
+                        stop_reason = f"Cost repeated {cost_repeat_times} times"
+                        stop_now = True
+                else:
+                    cost_repeat_count = 0
+
+            if not stop_now and use_gap_repeat:
+                if last_gap is not None and abs(gap - last_gap) < 1e-6:
+                    gap_repeat_count += 1
+                    if gap_repeat_count >= gap_repeat_times:
+                        stop_reason = f"Gap repeated {gap_repeat_times} times"
+                        stop_now = True
+                else:
+                    gap_repeat_count = 0
+
+            if not stop_now and use_contraction:
+                if diff < diff_tol and R_val < R_tol:
+                    stop_reason = f"Contraction: diff < {diff_tol} and R < {R_tol}"
+                    stop_now = True
+
+            last_cost = new_cost
+            last_gap = gap
+            last_R = R_val
+            last_y = new_y.copy()
+
+            if stop_now:
+                cycles_done = cycle + 1
+                break
 
     if cycles_done == 0:
         cycles_done = max_cycles
@@ -672,7 +772,258 @@ def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
         'total_time': total_time
     }
 
-# ------------------- دوال قراءة ملفات UFLP -------------------
+# ------------------- دوال المسائل العامة (ILP فقط، بدون LP مستمر) -------------------
+def solve_lp_pulp_integer(c, A, b):
+    """حل LP relaxation فقط (للمتغيرات المستمرة) - يستخدم للحصول على x_lp و lp_val"""
+    n = len(c)
+    m = len(b)
+    prob = pulp.LpProblem("LP_Relax", pulp.LpMinimize)
+    x = [pulp.LpVariable(f"x_{i}", lowBound=0, cat='Continuous') for i in range(n)]
+    prob += pulp.lpSum(c[i] * x[i] for i in range(n))
+    for j in range(m):
+        prob += pulp.lpSum(A[j][i] * x[i] for i in range(n)) <= b[j]
+    solver = pulp.PULP_CBC_CMD(msg=False)
+    prob.solve(solver)
+    if prob.status == pulp.LpStatusOptimal:
+        x_val = np.array([pulp.value(x[i]) for i in range(n)])
+        obj_val = pulp.value(prob.objective)
+        return x_val, obj_val
+    else:
+        return None, None
+
+def evaluate_integer_solution(x, c, A, b):
+    """تقييم حل صحيح مع التحقق من الجدوى"""
+    x_int = np.round(x).astype(int)
+    x_int = np.maximum(x_int, 0)
+    if np.all(A @ x_int <= b + 1e-6) and np.all(x_int >= 0):
+        return c @ x_int, x_int
+    else:
+        return float('inf'), None
+
+def vcycle_general_ilp(y, c, A, b, coarse, y_lp, R, executor=None):
+    """دورة V للمسائل الصحيحة العامة"""
+    n = len(y)
+    y_smooth = y.copy()
+    best_cost, _ = evaluate_integer_solution(y, c, A, b)
+    if best_cost == float('inf'):
+        best_cost = c @ y
+
+    alpha = R / 5
+    frac_idx = np.where((y > 0.01) & (y < 0.99))[0]
+    if len(frac_idx) == 0:
+        frac_idx = list(range(n))
+
+    dirs = generate_biased_directions(y_lp, frac_idx, 10, alpha, bias_strength=0.5)
+    for u in dirs:
+        for sign in [1, -1]:
+            y_cand = y[frac_idx] + sign * alpha * u
+            y_cand_int = np.round(y_cand).astype(int)
+            y_cand_int = np.maximum(y_cand_int, 0)
+            y_full = y.copy()
+            y_full[frac_idx] = y_cand_int
+            cost, feasible = evaluate_integer_solution(y_full, c, A, b)
+            if feasible is not None and cost < best_cost - 1e-6:
+                best_cost = cost
+                y_smooth = y_full.copy()
+
+    if len(coarse) > 0:
+        y_coarse = y_smooth.copy()
+        ones = np.where(y_coarse > 0.5)[0].tolist()
+        zeros = np.where(y_coarse < 0.5)[0].tolist()
+        for i in ones:
+            if i not in coarse:
+                continue
+            for j in zeros:
+                if j not in coarse:
+                    continue
+                y_new = y_coarse.copy()
+                y_new[i] = 0
+                y_new[j] = 1
+                cost, feasible = evaluate_integer_solution(y_new, c, A, b)
+                if feasible is not None and cost < best_cost - 1e-6:
+                    best_cost = cost
+                    y_smooth = y_new.copy()
+    return best_cost, y_smooth
+
+def solve_ahrh_general_ilp(c, A, b, max_cycles=20, k_coarse=5, patience=5,
+                           use_R=False, R_tol=1e-6, stable_gap_needed=2,
+                           use_cost_repeat=False, cost_repeat_times=2,
+                           use_gap_repeat=False, gap_repeat_times=2,
+                           use_contraction=False, diff_tol=1e-12):
+    n = len(c)
+    m = len(b)
+
+    x_lp, lp_val = solve_lp_pulp_integer(c, A, b)
+    if x_lp is None:
+        return None, None, None
+
+    R_initial = compute_R(x_lp)
+    R = R_initial if R_initial > 0 else 1.0
+
+    # حل ابتدائي (تقريب حل LP)
+    x = np.round(x_lp).astype(int)
+    x = np.maximum(x, 0)
+    best_cost, _ = evaluate_integer_solution(x, c, A, b)
+    if best_cost == float('inf'):
+        x = np.zeros(n, dtype=int)
+        best_cost, _ = evaluate_integer_solution(x, c, A, b)
+
+    cycles_log = []
+    gap_history = []
+    R_history = []
+    no_improve = 0
+    cycles_done = 0
+    stop_reason = ""
+    acceleration_active = False
+
+    cost_repeat_count = 0
+    gap_repeat_count = 0
+    stable_gap_count = 0
+    last_cost = None
+    last_gap = None
+    last_R = None
+    last_x = x.copy()
+
+    progress_bar = st.progress(0)
+    status_placeholder = st.empty()
+    details_placeholder = st.empty()
+    start_time = time.time()
+    total_time = 0.0
+
+    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        for cycle in range(max_cycles):
+            cycle_start = time.time()
+            current_R = R / (cycle + 1)
+
+            # اختيار مجموعة خشنة
+            coarse = []
+            if x_lp is not None:
+                open_now = np.where(x > 0.5)[0].tolist()
+                top_lp = np.argsort(-x_lp)[:k_coarse].tolist()
+                coarse = list(set(open_now + top_lp))
+                if len(coarse) > 10:
+                    importance = [(i, x_lp[i]) for i in coarse]
+                    importance.sort(key=lambda x: x[1], reverse=True)
+                    coarse = [i for i, _ in importance[:10]]
+
+            new_cost, new_x = vcycle_general_ilp(x, c, A, b, coarse, x_lp, current_R, executor=executor)
+            gap = (new_cost - lp_val) / lp_val * 100 if lp_val != 0 else 0
+            R_val = compute_R(new_x)
+            diff = np.linalg.norm(new_x - last_x)
+
+            improved = new_cost < best_cost - 1e-6
+            if improved:
+                best_cost = new_cost
+                x = new_x
+                no_improve = 0
+            else:
+                no_improve += 1
+
+            cycle_time = time.time() - cycle_start
+            total_time = time.time() - start_time
+
+            gap_history.append(gap)
+            R_history.append(R_val)
+            cycles_log.append({
+                'cycle': cycle+1,
+                'cost': new_cost,
+                'gap': gap,
+                'R': R_val,
+                'diff': diff,
+                'improved': improved,
+                'best_so_far': best_cost,
+                'cycle_time': cycle_time,
+                'total_time': total_time
+            })
+
+            progress_bar.progress((cycle + 1) / max_cycles)
+            status_placeholder.info(f"**Cycle {cycle+1} / {max_cycles}**")
+            details_placeholder.markdown(
+                f"**Current cost:** {new_cost:,.2f}  \n"
+                f"**Gap:** {gap:.4f}%  \n"
+                f"**R:** {R_val:.6f}  \n"
+                f"**Cycle time:** {cycle_time:.3f} s  \n"
+                f"**Total time:** {total_time:.2f} s  \n"
+                f"**Improved:** {'✅' if improved else '❌'}  \n"
+                f"**Best so far:** {best_cost:,.2f}"
+            )
+            # لا يوجد sleep
+
+            if not acceleration_active and gap < 2.0 and R_val < 0.01:
+                acceleration_active = True
+                st.info(t('acceleration_on'))
+            elif acceleration_active and (gap >= 2.0 or R_val >= 0.01):
+                acceleration_active = False
+
+            stop_now = False
+
+            if no_improve >= patience:
+                stop_reason = f"Patience ({patience} cycles without improvement)"
+                stop_now = True
+
+            if not stop_now and use_R and current_R < R_tol:
+                if last_gap is not None and abs(gap - last_gap) < 1e-6:
+                    stable_gap_count += 1
+                    if stable_gap_count >= stable_gap_needed:
+                        stop_reason = f"R < {R_tol} and gap stable for {stable_gap_needed} cycles"
+                        stop_now = True
+                else:
+                    stable_gap_count = 0
+
+            if not stop_now and use_cost_repeat and last_cost is not None and abs(new_cost - last_cost) < 1e-6:
+                cost_repeat_count += 1
+                if cost_repeat_count >= cost_repeat_times:
+                    stop_reason = f"Cost repeated {cost_repeat_times} times"
+                    stop_now = True
+            else:
+                cost_repeat_count = 0
+
+            if not stop_now and use_gap_repeat and last_gap is not None and abs(gap - last_gap) < 1e-6:
+                gap_repeat_count += 1
+                if gap_repeat_count >= gap_repeat_times:
+                    stop_reason = f"Gap repeated {gap_repeat_times} times"
+                    stop_now = True
+            else:
+                gap_repeat_count = 0
+
+            if not stop_now and use_contraction and diff < diff_tol and current_R < R_tol:
+                stop_reason = f"Contraction: diff < {diff_tol} and R < {R_tol}"
+                stop_now = True
+
+            last_cost = new_cost
+            last_gap = gap
+            last_R = R_val
+            last_x = new_x.copy()
+
+            if stop_now:
+                cycles_done = cycle + 1
+                break
+
+    if cycles_done == 0:
+        cycles_done = max_cycles
+        stop_reason = f"Max cycles ({max_cycles}) reached"
+
+    total_time = time.time() - start_time
+    progress_bar.empty()
+    status_placeholder.empty()
+    details_placeholder.empty()
+
+    if acceleration_active:
+        st.info(t('acceleration_on'))
+
+    return {
+        'best_cost': best_cost,
+        'lp_val': lp_val,
+        'gap': (best_cost - lp_val) / lp_val * 100 if lp_val != 0 else 0,
+        'cycles_done': cycles_done,
+        'gap_history': gap_history,
+        'R_history': R_history,
+        'cycles_log': cycles_log,
+        'stop_reason': stop_reason,
+        'total_time': total_time
+    }, x
+
+# ------------------- دوال قراءة الملفات -------------------
 def read_uflp_file(text):
     lines = text.strip().splitlines()
     clean_lines = []
@@ -718,6 +1069,39 @@ def read_uflp_file(text):
             raise ValueError(f"السطر {data_start+1+i+1} لا يحتوي على العدد المناسب من القيم.")
     return f, c, n, m
 
+def read_ilp_file(text):
+    lines = text.strip().splitlines()
+    clean_lines = []
+    for line in lines:
+        line = line.strip()
+        if line and not line.startswith('#') and not line.startswith('!') and not line.upper().startswith('FILE:'):
+            clean_lines.append(line)
+    if len(clean_lines) < 3:
+        raise ValueError("الملف لا يحتوي على بيانات كافية.")
+    parts = clean_lines[0].split()
+    n = int(parts[0])
+    m = int(parts[1])
+    c = np.array(list(map(float, clean_lines[1].split())))
+    if len(c) != n:
+        raise ValueError("عدد معاملات الهدف لا يتطابق مع n")
+    A = np.zeros((m, n))
+    for i in range(m):
+        row = list(map(float, clean_lines[2+i].split()))
+        if len(row) != n:
+            raise ValueError(f"عدد عناصر الصف {i} لا يتطابق مع n")
+        A[i] = row
+    b_line = clean_lines[2+m].split()
+    b = np.array(list(map(float, b_line)))
+    if len(b) != m:
+        raise ValueError("عدد عناصر b لا يتطابق مع m")
+    return c, A, b, n, m
+
+def generate_random_ilp(n, m):
+    c = np.random.uniform(1, 10, n)
+    A = np.random.uniform(0, 5, (m, n))
+    b = np.random.uniform(5, 20, m)
+    return c, A, b
+
 def generate_random_uflp(n, m):
     f = np.random.uniform(1000, 20000, n)
     c = np.random.uniform(100, 500, (n, m))
@@ -745,7 +1129,7 @@ def send_to_github_issue(comment, repo_owner, repo_name, token):
         return False, str(e)
 
 # ------------------- واجهة Streamlit -------------------
-st.set_page_config(page_title="AHRH Solver - UFLP", layout="wide")
+st.set_page_config(page_title="AHRH Solver - ILP & UFLP", layout="wide")
 
 col1, col2 = st.columns([4, 1])
 with col2:
@@ -768,7 +1152,7 @@ st.markdown(f"- {t('feature1')}\n- {t('feature2')}\n- {t('feature3')}\n- {t('fea
 
 with st.sidebar:
     st.header(t('sidebar_algo'))
-    max_cycles = st.slider(t('max_cycles'), 5, 50, 15, 5)
+    max_cycles = st.slider(t('max_cycles'), 5, 100, 30, 5)  # زيادة إلى 100
     k_coarse = st.slider(t('k_coarse'), 3, 10, 5)
     patience = st.slider(t('patience'), 2, 10, 3)
 
@@ -803,29 +1187,21 @@ with st.sidebar:
     st.markdown("---")
     st.write(f"{t('workers')}: {NUM_WORKERS}")
 
+# اختيار نوع المسألة (ILP أو UFLP)
+problem_type = st.radio(t('problem_type'), [t('ilp'), t('uflp')])
+is_uflp = (problem_type == t('uflp'))
+
 tab1, tab2, tab3 = st.tabs([t('tab_upload'), t('tab_random'), t('tab_manual')])
 
 with tab1:
     st.header(t('upload_header'))
     st.info(t('upload_info'))
     
-    # شرح تنسيق الملف (اختياري)
     with st.expander("📄 مساعدة حول تنسيق الملف"):
-        st.markdown("""
-        **تنسيق ملف UFLP (مثل gs250, capb):**
-        - السطر الأول: `n m 0` حيث n عدد المواقع، m عدد العملاء.
-        - ثم n سطر، كل سطر يمثل موقعاً: `[رقم الموقع] [تكلفة الفتح] [تكلفة النقل إلى العميل 1] [تكلفة النقل إلى العميل 2] ... [تكلفة النقل إلى العميل m]`
-        - مثال:
-        ```
-        5 3 0
-        1 100 5 6 7
-        2 150 8 9 10
-        3 120 4 5 6
-        4 130 7 8 9
-        5 110 3 4 5
-        ```
-        - يتم تجاهل الأسطر التي تبدأ بـ # أو ! أو FILE:.
-        """)
+        if is_uflp:
+            st.markdown(t('uflp_format_help'))
+        else:
+            st.markdown(t('ilp_format_help'))
     
     uploaded_file = st.file_uploader(t('choose_file'), type=None)
     if uploaded_file is not None:
@@ -835,8 +1211,50 @@ with tab1:
             except:
                 text = uploaded_file.getvalue().decode("latin-1")
             try:
-                f, c, n, m = read_uflp_file(text)
-                st.success(f"File loaded: {n} facilities, {m} customers")
+                if is_uflp:
+                    f, c, n, m = read_uflp_file(text)
+                    st.success(f"File loaded: {n} facilities, {m} customers")
+                    result = solve_ahrh_uflp(
+                        f, c,
+                        max_cycles, k_coarse, patience,
+                        use_R, R_tol, stable_gap_needed,
+                        use_cost_repeat, cost_repeat_times,
+                        use_gap_repeat, gap_repeat_times,
+                        use_contraction, diff_tol
+                    )
+                    if result:
+                        st.session_state['result'] = result
+                        st.session_state['n'] = n
+                        st.session_state['m'] = m
+                else:
+                    c, A, b, n, m = read_ilp_file(text)
+                    st.success(f"File loaded: {n} variables, {m} constraints")
+                    result, x = solve_ahrh_general_ilp(
+                        c, A, b,
+                        max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
+                        use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
+                        use_cost_repeat=use_cost_repeat, cost_repeat_times=cost_repeat_times,
+                        use_gap_repeat=use_gap_repeat, gap_repeat_times=gap_repeat_times,
+                        use_contraction=use_contraction, diff_tol=diff_tol
+                    )
+                    if result:
+                        st.session_state['result'] = result
+                        st.session_state['n'] = n
+                        st.session_state['m'] = m
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
+
+with tab2:
+    st.header(t('random_header'))
+    col1, col2 = st.columns(2)
+    with col1:
+        n_rand = st.number_input(t('random_n'), min_value=5, max_value=50, value=10, step=1, key="n_rand")
+    with col2:
+        m_rand = st.number_input(t('random_m'), min_value=5, max_value=50, value=10, step=1, key="m_rand")
+    if st.button(t('random_button'), key="gen_rand"):
+        with st.spinner("Generating and solving..."):
+            if is_uflp:
+                f, c = generate_random_uflp(int(n_rand), int(m_rand))
                 result = solve_ahrh_uflp(
                     f, c,
                     max_cycles, k_coarse, patience,
@@ -847,97 +1265,157 @@ with tab1:
                 )
                 if result:
                     st.session_state['result'] = result
-                    st.session_state['n'] = n
-                    st.session_state['m'] = m
-            except Exception as e:
-                st.error(f"Error reading file: {e}")
-
-with tab2:
-    st.header(t('random_header'))
-    col1, col2 = st.columns(2)
-    with col1:
-        n_rand = st.number_input(t('random_n'), min_value=5, max_value=200, value=50, step=5, key="n_rand")
-    with col2:
-        m_rand = st.number_input(t('random_m'), min_value=5, max_value=200, value=50, step=5, key="m_rand")
-    if st.button(t('random_button'), key="gen_rand"):
-        with st.spinner("Generating and solving..."):
-            f, c = generate_random_uflp(int(n_rand), int(m_rand))
-            result = solve_ahrh_uflp(
-                f, c,
-                max_cycles, k_coarse, patience,
-                use_R, R_tol, stable_gap_needed,
-                use_cost_repeat, cost_repeat_times,
-                use_gap_repeat, gap_repeat_times,
-                use_contraction, diff_tol
-            )
-            if result:
-                st.session_state['result'] = result
-                st.session_state['n'] = n_rand
-                st.session_state['m'] = m_rand
-                st.success("Done!")
+                    st.session_state['n'] = n_rand
+                    st.session_state['m'] = m_rand
+            else:
+                c, A, b = generate_random_ilp(int(n_rand), int(m_rand))
+                result, x = solve_ahrh_general_ilp(
+                    c, A, b,
+                    max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
+                    use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
+                    use_cost_repeat=use_cost_repeat, cost_repeat_times=cost_repeat_times,
+                    use_gap_repeat=use_gap_repeat, gap_repeat_times=gap_repeat_times,
+                    use_contraction=use_contraction, diff_tol=diff_tol
+                )
+                if result:
+                    st.session_state['result'] = result
+                    st.session_state['n'] = n_rand
+                    st.session_state['m'] = m_rand
+            st.success("Done!")
 
 with tab3:
     st.header(t('manual_header'))
     st.warning(t('manual_warning'))
+    
     col1, col2 = st.columns(2)
     with col1:
         n_man = st.number_input(t('manual_n'), min_value=1, max_value=10, value=3, step=1, key="n_man")
     with col2:
         m_man = st.number_input(t('manual_m'), min_value=1, max_value=10, value=3, step=1, key="m_man")
 
-    if 'f_man' not in st.session_state or st.session_state.get('n_man_prev') != n_man:
-        st.session_state['f_man'] = np.zeros(n_man)
-        st.session_state['n_man_prev'] = n_man
-    if 'c_man' not in st.session_state or st.session_state.get('n_man_prev') != n_man or st.session_state.get('m_man_prev') != m_man:
-        st.session_state['c_man'] = np.zeros((n_man, m_man))
-        st.session_state['m_man_prev'] = m_man
+    if is_uflp:
+        # UFLP manual input with data editors
+        st.subheader(t('manual_f'))
+        if 'f_man_df' not in st.session_state or st.session_state.get('n_man_prev') != n_man:
+            st.session_state.f_man_df = pd.DataFrame(np.zeros((n_man, 1)), columns=[t('manual_f')])
+            st.session_state.n_man_prev = n_man
+        
+        f_df = st.data_editor(st.session_state.f_man_df, use_container_width=True, num_rows="fixed")
+        st.session_state.f_man_df = f_df
+        f_vals = f_df.iloc[:, 0].values.astype(float)
 
-    st.subheader(t('manual_f'))
-    f_vals = []
-    cols = st.columns(min(5, n_man))
-    for i in range(n_man):
-        with cols[i % 5]:
-            val = st.number_input(f"f[{i}]", value=float(st.session_state['f_man'][i]), key=f"f_man_{i}")
-            f_vals.append(val)
-    st.session_state['f_man'] = np.array(f_vals)
+        st.subheader(t('manual_costs'))
+        if 'c_man_df' not in st.session_state or st.session_state.get('n_man_prev2') != n_man or st.session_state.get('m_man_prev') != m_man:
+            st.session_state.c_man_df = pd.DataFrame(np.zeros((n_man, m_man)), columns=[f'c_{j}' for j in range(m_man)])
+            st.session_state.n_man_prev2 = n_man
+            st.session_state.m_man_prev = m_man
+        
+        c_df = st.data_editor(st.session_state.c_man_df, use_container_width=True, num_rows="fixed")
+        st.session_state.c_man_df = c_df
+        c_vals = c_df.values.astype(float)
 
-    st.subheader(t('manual_c'))
-    c_vals = np.zeros((n_man, m_man))
-    for i in range(n_man):
-        st.write(f"**{t('manual_c')} {i}:**")
-        cols = st.columns(min(5, m_man))
-        for j in range(m_man):
-            with cols[j % 5]:
-                val = st.number_input(f"c[{i}][{j}]", value=float(st.session_state['c_man'][i, j]), key=f"c_man_{i}_{j}")
-                c_vals[i, j] = val
-    st.session_state['c_man'] = c_vals
+        col_ex1, col_ex2 = st.columns(2)
+        with col_ex1:
+            if st.button(t('manual_example_button')):
+                # Example: 3 facilities, 3 customers
+                example_f = np.array([1000, 1500, 1200])
+                example_c = np.array([[200, 150, 300],
+                                      [250, 100, 200],
+                                      [180, 220, 250]])
+                st.session_state.f_man_df = pd.DataFrame(example_f.reshape(-1,1), columns=[t('manual_f')])
+                st.session_state.c_man_df = pd.DataFrame(example_c, columns=[f'c_{j}' for j in range(3)])
+                st.success(t('manual_fill_example'))
+                st.rerun()
+        with col_ex2:
+            if st.button(t('solve_button'), key="solve_manual_uflp"):
+                with st.spinner("Running algorithm..."):
+                    result = solve_ahrh_uflp(
+                        f_vals, c_vals,
+                        max_cycles, k_coarse, patience,
+                        use_R, R_tol, stable_gap_needed,
+                        use_cost_repeat, cost_repeat_times,
+                        use_gap_repeat, gap_repeat_times,
+                        use_contraction, diff_tol
+                    )
+                    if result:
+                        st.session_state['result'] = result
+                        st.session_state['n'] = n_man
+                        st.session_state['m'] = m_man
+                        st.success("Done!")
 
-    if st.button(t('solve_button'), key="solve_manual"):
-        with st.spinner("Running algorithm..."):
-            result = solve_ahrh_uflp(
-                st.session_state['f_man'], st.session_state['c_man'],
-                max_cycles, k_coarse, patience,
-                use_R, R_tol, stable_gap_needed,
-                use_cost_repeat, cost_repeat_times,
-                use_gap_repeat, gap_repeat_times,
-                use_contraction, diff_tol
-            )
-            if result:
-                st.session_state['result'] = result
-                st.session_state['n'] = n_man
-                st.session_state['m'] = m_man
-                st.success("Done!")
+    else:
+        # ILP manual input with data editors
+        st.subheader(t('manual_c'))
+        if 'c_man_df' not in st.session_state or st.session_state.get('n_man_prev') != n_man:
+            st.session_state.c_man_df = pd.DataFrame(np.zeros((1, n_man)), columns=[f'x{i}' for i in range(n_man)])
+            st.session_state.n_man_prev = n_man
+        c_df = st.data_editor(st.session_state.c_man_df, use_container_width=True, num_rows="fixed")
+        st.session_state.c_man_df = c_df
+        c_vals = c_df.iloc[0].values.astype(float)
+
+        st.subheader(t('manual_A'))
+        if 'A_man_df' not in st.session_state or st.session_state.get('n_man_prevA') != n_man or st.session_state.get('m_man_prevA') != m_man:
+            st.session_state.A_man_df = pd.DataFrame(np.zeros((m_man, n_man)), columns=[f'x{i}' for i in range(n_man)])
+            st.session_state.n_man_prevA = n_man
+            st.session_state.m_man_prevA = m_man
+        A_df = st.data_editor(st.session_state.A_man_df, use_container_width=True, num_rows="fixed")
+        st.session_state.A_man_df = A_df
+        A_vals = A_df.values.astype(float)
+
+        st.subheader(t('manual_b'))
+        if 'b_man_df' not in st.session_state or st.session_state.get('m_man_prevB') != m_man:
+            st.session_state.b_man_df = pd.DataFrame(np.zeros((m_man, 1)), columns=['b'])
+            st.session_state.m_man_prevB = m_man
+        b_df = st.data_editor(st.session_state.b_man_df, use_container_width=True, num_rows="fixed")
+        st.session_state.b_man_df = b_df
+        b_vals = b_df.iloc[:, 0].values.astype(float)
+
+        col_ex1, col_ex2 = st.columns(2)
+        with col_ex1:
+            if st.button(t('manual_example_button')):
+                # Example: n=3, m=2
+                example_c = np.array([3, 1, 2])
+                example_A = np.array([[1, 1, 1],
+                                      [2, 0, 1]])
+                example_b = np.array([10, 5])
+                st.session_state.c_man_df = pd.DataFrame(example_c.reshape(1,-1), columns=[f'x{i}' for i in range(3)])
+                st.session_state.A_man_df = pd.DataFrame(example_A, columns=[f'x{i}' for i in range(3)])
+                st.session_state.b_man_df = pd.DataFrame(example_b.reshape(-1,1), columns=['b'])
+                st.success(t('manual_fill_example'))
+                st.rerun()
+        with col_ex2:
+            if st.button(t('solve_button'), key="solve_manual_ilp"):
+                with st.spinner("Running algorithm..."):
+                    result, x = solve_ahrh_general_ilp(
+                        c_vals, A_vals, b_vals,
+                        max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
+                        use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
+                        use_cost_repeat=use_cost_repeat, cost_repeat_times=cost_repeat_times,
+                        use_gap_repeat=use_gap_repeat, gap_repeat_times=gap_repeat_times,
+                        use_contraction=use_contraction, diff_tol=diff_tol
+                    )
+                    if result:
+                        st.session_state['result'] = result
+                        st.session_state['n'] = n_man
+                        st.session_state['m'] = m_man
+                        st.success("Done!")
 
 st.markdown("---")
 st.header(t('results'))
 
 if 'result' in st.session_state:
     res = st.session_state['result']
-    colA, colB, colC, colD = st.columns(4)
-    colA.metric(t('best_cost'), f"{res['best_cost']:,.0f}")
-    colB.metric(t('lp_val'), f"{res['lp_val']:,.0f}")
-    colC.metric(t('gap'), f"{res['gap']:.4f}%")
-    colD.metric(t('open_fac'), res['open_fac'])
+    if 'open_fac' in res:  # UFLP
+        colA, colB, colC, colD = st.columns(4)
+        colA.metric(t('best_cost'), f"{res['best_cost']:,.0f}")
+        colB.metric(t('lp_val'), f"{res['lp_val']:,.0f}")
+        colC.metric(t('gap'), f"{res['gap']:.4f}%")
+        colD.metric(t('open_fac'), res['open_fac'])
+    else:  # ILP
+        colA, colB, colC = st.columns(3)
+        colA.metric(t('best_cost'), f"{res['best_cost']:,.2f}")
+        colB.metric(t('lp_val'), f"{res['lp_val']:,.2f}")
+        colC.metric(t('gap'), f"{res['gap']:.4f}%")
 
     colE, colF, colG = st.columns(3)
     colE.metric(t('cycles_done'), res['cycles_done'])
@@ -973,7 +1451,9 @@ if 'result' in st.session_state:
             'R': 'R',
             'diff': 'Diff',
             'improved': t('improved'),
-            'best_so_far': t('best_so_far')
+            'best_so_far': t('best_so_far'),
+            'cycle_time': 'Cycle Time (s)',
+            'total_time': 'Total Time (s)'
         })
         df_cycles[t('improved')] = df_cycles[t('improved')].apply(lambda x: t('yes') if x else t('no'))
         st.dataframe(df_cycles, use_container_width=True)
