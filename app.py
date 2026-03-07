@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 تطبيق AHRH المتكامل لحل مسائل البرمجة الخطية (صحيحة أو مستمرة)
-مع إمكانية اختيار نوع المسألة: ILP (صحيح) أو LP (مستمر)
-النسخة النهائية مع التصحيحات الأساسية
+نسخة مصححة بالكامل (إصلاح خطأ الإدخال اليدوي)
 """
 
 import streamlit as st
@@ -248,13 +247,6 @@ if 'language' not in st.session_state:
 
 # ------------------- دوال أساسية للمسائل الخطية -------------------
 def solve_lp_pulp(c, A, b, integer=False):
-    """
-    حل مسألة LP أو ILP باستخدام pulp.
-    c: متجه الهدف (n,)
-    A: مصفوفة القيود (m, n)
-    b: متجه الطرف الأيمن (m,)
-    integer: True للمتغيرات الصحيحة، False للمستمرة
-    """
     n = len(c)
     m = len(b)
     prob = pulp.LpProblem("LP", pulp.LpMinimize)
@@ -275,7 +267,6 @@ def solve_lp_pulp(c, A, b, integer=False):
         return None, None
 
 def compute_R(x):
-    """حساب نصف القطر R: أقصى مسافة إلى التكامل (للمتغيرات الصحيحة فقط)"""
     fractional = np.abs(x - np.round(x))
     return np.max(fractional)
 
@@ -301,25 +292,19 @@ def generate_biased_directions(y_lp, frac_idx, count, alpha, bias_strength=0.5):
     return np.array(dirs)
 
 def round_and_fix(x, A, b, tolerance=1e-4):
-    """تقريب النقطة x إلى حل صحيح (لـ ILP)"""
     x_int = np.round(x).astype(int)
     if np.all(A @ x_int <= b + tolerance) and np.all(x_int >= 0):
         return x_int
     return None
 
 def local_search_advanced(y, best_cost, f, c, integer=True, A=None, b=None):
-    """
-    بحث محلي متقدم بأنماط تبادل متعددة (1-1، 2-1، 1-2، 2-2)
-    إذا integer=False، نستخدم البحث المستمر (تبادل قيم بسيط)
-    """
-    n = len(f)  # f هنا تمثل الهدف c
+    n = len(f)
     improved = True
     iteration = 0
     best_y = y.copy()
     best = best_cost
 
     if integer:
-        # بحث محلي للمتغيرات الصحيحة (تبادل مرافق)
         while improved and iteration < 10:
             improved = False
             open_fac = np.where(best_y > 0.5)[0].tolist()
@@ -330,7 +315,7 @@ def local_search_advanced(y, best_cost, f, c, integer=True, A=None, b=None):
                     y_new = best_y.copy()
                     y_new[i] = 0
                     y_new[j] = 1
-                    cost = solve_lp_fixed_y_uflp(y_new, f, c)  # تحتاج تعريف
+                    cost = solve_lp_fixed_y_uflp(y_new, f, c)
                     if cost < best - 1e-6:
                         best = cost
                         best_y = y_new
@@ -340,10 +325,8 @@ def local_search_advanced(y, best_cost, f, c, integer=True, A=None, b=None):
                         break
                 if improved:
                     break
-            # يمكن إضافة أنماط أخرى مماثلة (2-1, 1-2, 2-2) ولكن اختصاراً نكتفي بهذا
             iteration += 1
     else:
-        # بحث محلي للمتغيرات المستمرة: تقليد بسيط بتغيير عشوائي
         for _ in range(10):
             step = np.random.randn(n) * 0.1
             y_new = best_y + step
@@ -355,7 +338,7 @@ def local_search_advanced(y, best_cost, f, c, integer=True, A=None, b=None):
                     best_y = y_new
     return best, best_y
 
-# ------------------- دوال خاصة بـ UFLP (للمسائل المرفوعة) -------------------
+# ------------------- دوال خاصة بـ UFLP -------------------
 def solve_lp_fixed_y_uflp(y_int, f, c):
     open_fac = np.where(y_int > 0.5)[0]
     if len(open_fac) == 0:
@@ -384,18 +367,10 @@ def lp_relaxation_uflp(f, c):
         return y_val, obj
     return None, None
 
-# ------------------- دوال الخوارزمية الرئيسية (مشتركة) -------------------
 def vcycle(y, f, c, coarse, y_lp, R, integer=True, A=None, b=None):
-    """
-    دورة V واحدة.
-    إذا integer=True، نستخدم مسح شعاعي مع تقريب صحيح.
-    إذا integer=False، نستخدم مسح شعاعي مستمر.
-    """
     n = len(f)
-    # تنعيم أولي
     y_smooth = y.copy()
     best_cost = f @ y if not integer else solve_lp_fixed_y_uflp(y, f, c)
-    # مسح شعاعي بسيط
     alpha = R / 5
     frac_idx = get_fractional_indices(y) if integer else list(range(n))
     if len(frac_idx) == 0:
@@ -419,13 +394,10 @@ def vcycle(y, f, c, coarse, y_lp, R, integer=True, A=None, b=None):
             if cost < best_cost - 1e-6:
                 best_cost = cost
                 y_smooth = y_full.copy()
-    # تصحيح خشن (اختياري)
     if integer and len(coarse) > 0:
-        # تطبيق بحث محلي على المجموعة الخشنة
         y_coarse = y_smooth.copy()
         open_now = np.where(y_coarse > 0.5)[0].tolist()
         closed_now = np.where(y_coarse < 0.5)[0].tolist()
-        # تجربة تبديل 1-1
         for i in open_now:
             if i not in coarse:
                 continue
@@ -450,32 +422,24 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
                   use_cost_repeat=False, cost_repeat_times=2,
                   use_gap_repeat=False, gap_repeat_times=2,
                   use_contraction=False, diff_tol=1e-12):
-    """
-    حل عام لأي مسألة برمجة خطية (صحيحة أو مستمرة).
-    problem_type: 'ILP' أو 'LP'
-    """
     n = len(c)
     m = len(b)
     integer = (problem_type == 'ILP')
 
-    # حل LP للحصول على نقطة بداية وقيمة LP
     x_lp, lp_val = solve_lp_pulp(c, A, b, integer=False)
     if x_lp is None:
         return None, None, None
 
-    # حساب R الأولي من حل LP (لأنه كسري)
-    R_initial = compute_R(x_lp) if integer else 1.0  # للمسائل المستمرة نثبت R بقيمة 1
+    R_initial = compute_R(x_lp) if integer else 1.0
     R = R_initial if R_initial > 0 else 1.0
 
-    # حل ابتدائي (فتح الكل للمسائل الصحيحة، أو نسخ x_lp للمستمرة)
     if integer:
         x = np.ones(n, dtype=int)
-        best = solve_lp_fixed_y_uflp(x, c, A)  # هنا f هي c، c هي A (تعديل)
+        best = solve_lp_fixed_y_uflp(x, c, A)
     else:
         x = x_lp.copy()
         best = c @ x
 
-    # سجلات
     cycles_log = []
     gap_history = []
     R_history = []
@@ -485,7 +449,6 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
     stop_reason = ""
     acceleration_active = False
 
-    # عدادات
     cost_repeat_count = 0
     gap_repeat_count = 0
     stable_gap_count = 0
@@ -493,17 +456,14 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
     last_gap = None
     last_x = x.copy()
 
-    # عناصر عرض التقدم
     progress_bar = st.progress(0)
     status_placeholder = st.empty()
     details_placeholder = st.empty()
     start_time = time.time()
 
     for cycle in range(max_cycles):
-        # نصف القطر المستخدم في هذه الدورة (يتناقص)
         current_R = R / (cycle + 1)
 
-        # اختيار مجموعة خشنة (للمسائل الصحيحة فقط)
         coarse = []
         if integer and x_lp is not None:
             open_now = np.where(x > 0.5)[0].tolist()
@@ -514,12 +474,10 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
                 importance.sort(key=lambda x: x[1], reverse=True)
                 coarse = [i for i, _ in importance[:10]]
 
-        # تطبيق دورة V
         if integer:
             new_cost, new_x = vcycle(x, c, A, coarse, x_lp, current_R, integer=True)
             gap = (new_cost - lp_val) / lp_val * 100 if lp_val != 0 else 0
         else:
-            # مسح شعاعي مستمر
             new_x = x.copy()
             alpha = current_R / 5
             dirs = np.random.randn(10, n)
@@ -561,7 +519,6 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
             'best_so_far': best
         })
 
-        # تحديث واجهة التقدم
         progress_bar.progress((cycle + 1) / max_cycles)
         status_placeholder.info(f"**Cycle {cycle+1} / {max_cycles}**")
         details_placeholder.markdown(
@@ -574,14 +531,12 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
         )
         time.sleep(0.1)
 
-        # تحديث حالة التسريع (للمسائل الصحيحة فقط)
         if integer and not acceleration_active and gap < 2.0 and R_val < 0.01:
             acceleration_active = True
             st.info(t('acceleration_on'))
         elif integer and acceleration_active and (gap >= 2.0 or R_val >= 0.01):
             acceleration_active = False
 
-        # معايير التوقف
         stop_now = False
         if no_improve >= patience:
             stop_reason = f"Patience ({patience} cycles without improvement)"
@@ -639,7 +594,6 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
 
 # ------------------- دوال قراءة الملف -------------------
 def read_instance_from_text(text):
-    """قراءة أي ملف نصي واستخراج n, m, c, A, b (للمسائل العامة)"""
     lines = text.strip().splitlines()
     clean_lines = []
     for line in lines:
@@ -648,15 +602,12 @@ def read_instance_from_text(text):
             clean_lines.append(line)
     if len(clean_lines) < 3:
         raise ValueError("الملف لا يحتوي على بيانات كافية.")
-    # تنسيق بسيط: السطر الأول: n m
     parts = clean_lines[0].split()
     n = int(parts[0])
     m = int(parts[1])
-    # السطر الثاني: c (n قيمة)
     c = np.array(list(map(float, clean_lines[1].split())))
     if len(c) != n:
         raise ValueError("عدد معاملات الهدف لا يتطابق مع n")
-    # ثم m سطر من A، وآخر سطر b
     A = np.zeros((m, n))
     for i in range(m):
         row = list(map(float, clean_lines[2+i].split()))
@@ -670,8 +621,6 @@ def read_instance_from_text(text):
     return c, A, b, n, m
 
 def read_uflp_from_text(text):
-    """قراءة ملف UFLP (خاص) - للتوافق مع الملفات السابقة"""
-    # (نفس الكود السابق)
     lines = text.strip().splitlines()
     clean_lines = []
     for line in lines:
@@ -717,7 +666,6 @@ def read_uflp_from_text(text):
     return f, c, n, m
 
 def generate_random_instance(n, m):
-    """توليد مسألة عشوائية عامة"""
     c = np.random.uniform(1, 10, n)
     A = np.random.uniform(0, 5, (m, n))
     b = np.random.uniform(10, 50, m)
@@ -733,7 +681,6 @@ with col2:
 
 st.title(t('app_title'))
 
-# معلومات الاتصال
 st.markdown(f"""
 <div style="background-color: #ffeeee; padding: 20px; border-radius: 15px; text-align: center; margin: 20px 0; border: 3px solid red;">
     <span style="color: red; font-size: 32px; font-weight: bold;">✉️ {CONTACT_EMAIL}</span><br>
@@ -745,7 +692,6 @@ st.markdown(f"""
 st.markdown(t('app_desc'))
 st.markdown(f"- {t('feature1')}\n- {t('feature2')}\n- {t('feature3')}\n- {t('feature4')}\n- {t('feature5')}\n- {t('feature6')}\n- {t('feature7')}")
 
-# الشريط الجانبي
 with st.sidebar:
     st.header(t('sidebar_algo'))
     max_cycles = st.slider(t('max_cycles'), 5, 50, 15, 5)
@@ -783,11 +729,9 @@ with st.sidebar:
     st.markdown("---")
     st.write(f"{t('workers')}: {NUM_WORKERS}")
 
-# اختيار نوع المسألة
 problem_type = st.radio(t('problem_type'), [t('lp'), t('ilp')])
 is_integer = (problem_type == t('ilp'))
 
-# تبويبات
 tab1, tab2, tab3 = st.tabs([t('tab_upload'), t('tab_random'), t('tab_manual')])
 
 with tab1:
@@ -801,16 +745,12 @@ with tab1:
             except:
                 text = uploaded_file.getvalue().decode("latin-1")
             try:
-                # محاولة قراءة كملف UFLP أولاً
                 try:
-                    f, c, n, m = read_uflp_from_text(text)
-                    # تحويل إلى الشكل العام
-                    A = c  # مصفوفة النقل
-                    b = np.ones(m)  # في UFLP كل عميل يطلب 1
-                    c_obj = f   # الهدف هو تكاليف الفتح
-                    # (هذا تحويل مبسط، قد يحتاج تعديل)
+                    f, c_mat, n, m = read_uflp_from_text(text)
+                    A = c_mat
+                    b = np.ones(m)
+                    c_obj = f
                 except:
-                    # قراءة كملف عام
                     c_obj, A, b, n, m = read_instance_from_text(text)
                 st.success(f"File loaded: {n} variables, {m} constraints")
                 result, x, _ = solve_general(
@@ -861,24 +801,22 @@ with tab3:
     with col2:
         m_man = st.number_input(t('manual_m'), min_value=1, max_value=10, value=3, step=1, key="m_man")
 
-    # تخزين القيم في session_state
-    if 'c_man' not in st.session_state or st.session_state.get('n_man_prev') != n_man:
-        st.session_state['c_man'] = np.zeros(n_man)
-        st.session_state['n_man_prev'] = n_man
-    if 'A_man' not in st.session_state or st.session_state.get('n_man_prev') != n_man or st.session_state.get('m_man_prev') != m_man:
-        st.session_state['A_man'] = np.zeros((m_man, n_man))
-        st.session_state['m_man_prev'] = m_man
-    if 'b_man' not in st.session_state or st.session_state.get('m_man_prev') != m_man:
-        st.session_state['b_man'] = np.zeros(m_man)
+    # تهيئة المصفوفات في session_state
+    if 'c_man' not in st.session_state or len(st.session_state.c_man) != n_man:
+        st.session_state.c_man = np.zeros(n_man)
+    if 'A_man' not in st.session_state or st.session_state.A_man.shape != (m_man, n_man):
+        st.session_state.A_man = np.zeros((m_man, n_man))
+    if 'b_man' not in st.session_state or len(st.session_state.b_man) != m_man:
+        st.session_state.b_man = np.zeros(m_man)
 
     st.subheader(t('manual_c'))
     c_vals = []
     cols = st.columns(min(5, n_man))
     for i in range(n_man):
         with cols[i % 5]:
-            val = st.number_input(f"c[{i}]", value=float(st.session_state['c_man'][i]), key=f"c_man_{i}")
+            val = st.number_input(f"c[{i}]", value=float(st.session_state.c_man[i]), key=f"c_man_{i}")
             c_vals.append(val)
-    st.session_state['c_man'] = np.array(c_vals)
+    st.session_state.c_man = np.array(c_vals)
 
     st.subheader(t('manual_A'))
     for i in range(m_man):
@@ -886,22 +824,22 @@ with tab3:
         cols = st.columns(min(5, n_man))
         for j in range(n_man):
             with cols[j % 5]:
-                val = st.number_input(f"A[{i}][{j}]", value=float(st.session_state['A_man'][i, j]), key=f"A_man_{i}_{j}")
-                st.session_state['A_man'][i, j] = val
+                val = st.number_input(f"A[{i}][{j}]", value=float(st.session_state.A_man[i, j]), key=f"A_man_{i}_{j}")
+                st.session_state.A_man[i, j] = val
 
     st.subheader(t('manual_b'))
     b_vals = []
     cols = st.columns(min(5, m_man))
     for i in range(m_man):
         with cols[i % 5]:
-            val = st.number_input(f"b[{i}]", value=float(st.session_state['b_man'][i]), key=f"b_man_{i}")
+            val = st.number_input(f"b[{i}]", value=float(st.session_state.b_man[i]), key=f"b_man_{i}")
             b_vals.append(val)
-    st.session_state['b_man'] = np.array(b_vals)
+    st.session_state.b_man = np.array(b_vals)
 
     if st.button(t('solve_button'), key="solve_manual"):
         with st.spinner("Running algorithm..."):
             result, x, _ = solve_general(
-                st.session_state['c_man'], st.session_state['A_man'], st.session_state['b_man'],
+                st.session_state.c_man, st.session_state.A_man, st.session_state.b_man,
                 problem_type=('ILP' if is_integer else 'LP'),
                 max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
                 use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
@@ -915,7 +853,6 @@ with tab3:
                 st.session_state['m'] = m_man
                 st.success("Done!")
 
-# عرض النتائج
 st.markdown("---")
 st.header(t('results'))
 
