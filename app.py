@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-تطبيق AHRH المتكامل لحل مسائل البرمجة الخطية (صحيحة أو مستمرة)
-نسخة مصححة بالكامل (إصلاح خطأ الإدخال اليدوي)
+تطبيق AHRH لحل مسائل البرمجة الخطية (صحيحة أو مستمرة)
+مع واجهة متعددة اللغات وعرض تطور الدورات والزمن
+نسخة محسنة ومعممة
 """
 
 import streamlit as st
@@ -13,11 +14,6 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import warnings
 warnings.filterwarnings("ignore")
-
-# ------------------- معلومات الاتصال -------------------
-CONTACT_EMAIL = "zakibeny@gmail.com"
-CONTACT_PHONE = "0021355614305 / 00213779679073"
-CONTACT_FAX = "036495241"
 
 # ------------------- إعدادات التوازي -------------------
 NUM_WORKERS = 4
@@ -76,7 +72,8 @@ translations = {
         'lp_val': 'قيمة LP',
         'gap': 'الفجوة',
         'cycles_done': 'عدد الدورات',
-        'time': 'الزمن (ث)',
+        'cycle_time': 'زمن الدورة (ث)',
+        'total_time': 'الزمن الإجمالي (ث)',
         'size': 'حجم المسألة',
         'stop_reason': 'سبب التوقف',
         'gap_plot': '📈 تطور الفجوة و R خلال الدورات',
@@ -147,7 +144,8 @@ translations = {
         'lp_val': 'LP Value',
         'gap': 'Gap',
         'cycles_done': 'Cycles Done',
-        'time': 'Time (s)',
+        'cycle_time': 'Cycle Time (s)',
+        'total_time': 'Total Time (s)',
         'size': 'Problem Size',
         'stop_reason': 'Stop Reason',
         'gap_plot': '📈 Gap & R Evolution',
@@ -218,7 +216,8 @@ translations = {
         'lp_val': 'Valeur LP',
         'gap': 'Écart',
         'cycles_done': 'Cycles effectués',
-        'time': 'Temps (s)',
+        'cycle_time': 'Temps par cycle (s)',
+        'total_time': 'Temps total (s)',
         'size': 'Taille du problème',
         'stop_reason': 'Raison de l\'arrêt',
         'gap_plot': '📈 Évolution du gap et de R',
@@ -247,6 +246,7 @@ if 'language' not in st.session_state:
 
 # ------------------- دوال أساسية للمسائل الخطية -------------------
 def solve_lp_pulp(c, A, b, integer=False):
+    """حل مسألة LP أو ILP باستخدام pulp"""
     n = len(c)
     m = len(b)
     prob = pulp.LpProblem("LP", pulp.LpMinimize)
@@ -267,6 +267,7 @@ def solve_lp_pulp(c, A, b, integer=False):
         return None, None
 
 def compute_R(x):
+    """نصف القطر R: أقصى مسافة إلى التكامل"""
     fractional = np.abs(x - np.round(x))
     return np.max(fractional)
 
@@ -291,179 +292,151 @@ def generate_biased_directions(y_lp, frac_idx, count, alpha, bias_strength=0.5):
         dirs.append(u)
     return np.array(dirs)
 
-def round_and_fix(x, A, b, tolerance=1e-4):
-    x_int = np.round(x).astype(int)
-    if np.all(A @ x_int <= b + tolerance) and np.all(x_int >= 0):
-        return x_int
-    return None
+def evaluate_solution(x, c, A, b, integer):
+    """تقييم حل: حساب التكلفة والتحقق من الجدوى"""
+    if integer:
+        x_int = np.round(x).astype(int)
+    else:
+        x_int = x
+    if np.all(A @ x_int <= b + 1e-6) and np.all(x_int >= 0):
+        return c @ x_int, x_int
+    else:
+        return float('inf'), None
 
-def local_search_advanced(y, best_cost, f, c, integer=True, A=None, b=None):
-    n = len(f)
+def local_search_advanced(y, best_cost, c, A, b, max_iter=5):
+    """بحث محلي للمتغيرات الصحيحة (تبادل 1-1)"""
+    n = len(y)
     improved = True
     iteration = 0
     best_y = y.copy()
     best = best_cost
 
-    if integer:
-        while improved and iteration < 10:
-            improved = False
-            open_fac = np.where(best_y > 0.5)[0].tolist()
-            closed_fac = np.where(best_y < 0.5)[0].tolist()
-            # 1-1 exchange
-            for i in open_fac:
-                for j in closed_fac:
-                    y_new = best_y.copy()
-                    y_new[i] = 0
-                    y_new[j] = 1
-                    cost = solve_lp_fixed_y_uflp(y_new, f, c)
-                    if cost < best - 1e-6:
-                        best = cost
-                        best_y = y_new
-                        improved = True
-                        open_fac = np.where(best_y > 0.5)[0].tolist()
-                        closed_fac = np.where(best_y < 0.5)[0].tolist()
-                        break
-                if improved:
-                    break
-            iteration += 1
-    else:
-        for _ in range(10):
-            step = np.random.randn(n) * 0.1
-            y_new = best_y + step
-            y_new = np.maximum(y_new, 0)
-            if np.all(A @ y_new <= b + 1e-6):
-                cost = f @ y_new
+    while improved and iteration < max_iter:
+        improved = False
+        ones = np.where(best_y > 0.5)[0].tolist()
+        zeros = np.where(best_y < 0.5)[0].tolist()
+        for i in ones:
+            for j in zeros:
+                y_new = best_y.copy()
+                y_new[i] = 0
+                y_new[j] = 1
+                cost, _ = evaluate_solution(y_new, c, A, b, integer=True)
                 if cost < best - 1e-6:
                     best = cost
                     best_y = y_new
+                    improved = True
+                    ones = np.where(best_y > 0.5)[0].tolist()
+                    zeros = np.where(best_y < 0.5)[0].tolist()
+                    break
+            if improved:
+                break
+        iteration += 1
     return best, best_y
 
-# ------------------- دوال خاصة بـ UFLP -------------------
-def solve_lp_fixed_y_uflp(y_int, f, c):
-    open_fac = np.where(y_int > 0.5)[0]
-    if len(open_fac) == 0:
-        return float('inf')
-    total = np.sum(f[open_fac])
-    for j in range(c.shape[1]):
-        total += min(c[i, j] for i in open_fac)
-    return total
-
-def lp_relaxation_uflp(f, c):
-    n, m = len(f), c.shape[1]
-    lp = pulp.LpProblem("UFLP_LP_Relax", pulp.LpMinimize)
-    y = [pulp.LpVariable(f"y_{i}", 0, 1) for i in range(n)]
-    x = {(i, j): pulp.LpVariable(f"x_{i}_{j}", 0) for i in range(n) for j in range(m)}
-    lp += pulp.lpSum(f[i] * y[i] for i in range(n)) + pulp.lpSum(c[i, j] * x[(i, j)] for i in range(n) for j in range(m))
-    for j in range(m):
-        lp += pulp.lpSum(x[(i, j)] for i in range(n)) == 1
-    for i in range(n):
-        for j in range(m):
-            lp += x[(i, j)] <= y[i]
-    solver = pulp.PULP_CBC_CMD(msg=False)
-    lp.solve(solver)
-    if lp.status == 1:
-        y_val = np.array([pulp.value(y[i]) for i in range(n)])
-        obj = pulp.value(lp.objective)
-        return y_val, obj
-    return None, None
-
-def vcycle(y, f, c, coarse, y_lp, R, integer=True, A=None, b=None):
-    n = len(f)
+def vcycle(y, c, A, b, coarse, y_lp, R, integer=True):
+    """دورة V واحدة"""
+    n = len(y)
     y_smooth = y.copy()
-    best_cost = f @ y if not integer else solve_lp_fixed_y_uflp(y, f, c)
+    best_cost, _ = evaluate_solution(y, c, A, b, integer)
+    if best_cost == float('inf'):
+        best_cost = c @ y  # fallback
+
     alpha = R / 5
-    frac_idx = get_fractional_indices(y) if integer else list(range(n))
+    frac_idx = np.where((y > 0.01) & (y < 0.99))[0] if integer else list(range(n))
     if len(frac_idx) == 0:
-        return best_cost, y
+        frac_idx = list(range(n))
+
     dirs = generate_biased_directions(y_lp, frac_idx, 10, alpha, bias_strength=0.5)
     for u in dirs:
         for sign in [1, -1]:
             y_cand = y[frac_idx] + sign * alpha * u
-            y_cand_int = y_cand.copy()
             if integer:
-                y_cand_int = np.round(y_cand).astype(int)
+                y_cand = np.round(y_cand).astype(int)
             y_full = y.copy()
-            y_full[frac_idx] = y_cand_int
-            if integer:
-                cost = solve_lp_fixed_y_uflp(y_full, f, c)
-            else:
-                if np.all(A @ y_full <= b + 1e-6) and np.all(y_full >= 0):
-                    cost = f @ y_full
-                else:
-                    continue
-            if cost < best_cost - 1e-6:
+            y_full[frac_idx] = y_cand
+            cost, feasible = evaluate_solution(y_full, c, A, b, integer)
+            if feasible is not None and cost < best_cost - 1e-6:
                 best_cost = cost
                 y_smooth = y_full.copy()
+
+    # تصحيح خشن (للمسائل الصحيحة فقط)
     if integer and len(coarse) > 0:
         y_coarse = y_smooth.copy()
-        open_now = np.where(y_coarse > 0.5)[0].tolist()
-        closed_now = np.where(y_coarse < 0.5)[0].tolist()
-        for i in open_now:
+        ones = np.where(y_coarse > 0.5)[0].tolist()
+        zeros = np.where(y_coarse < 0.5)[0].tolist()
+        for i in ones:
             if i not in coarse:
                 continue
-            for j in closed_now:
+            for j in zeros:
                 if j not in coarse:
                     continue
                 y_new = y_coarse.copy()
                 y_new[i] = 0
                 y_new[j] = 1
-                cost = solve_lp_fixed_y_uflp(y_new, f, c)
-                if cost < best_cost - 1e-6:
+                cost, feasible = evaluate_solution(y_new, c, A, b, integer)
+                if feasible is not None and cost < best_cost - 1e-6:
                     best_cost = cost
                     y_smooth = y_new.copy()
     return best_cost, y_smooth
 
-def get_fractional_indices(y, eps=0.01):
-    return np.where((y > eps) & (y < 1 - eps))[0]
-
-# ------------------- دالة الحل الرئيسية -------------------
-def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patience=5,
-                  use_R=False, R_tol=1e-6, stable_gap_needed=2,
-                  use_cost_repeat=False, cost_repeat_times=2,
-                  use_gap_repeat=False, gap_repeat_times=2,
-                  use_contraction=False, diff_tol=1e-12):
+def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patience=5,
+                       use_R=False, R_tol=1e-6, stable_gap_needed=2,
+                       use_cost_repeat=False, cost_repeat_times=2,
+                       use_gap_repeat=False, gap_repeat_times=2,
+                       use_contraction=False, diff_tol=1e-12):
+    """الدالة الرئيسية لحل أي مسألة LP/ILP"""
     n = len(c)
     m = len(b)
-    integer = (problem_type == 'ILP')
 
+    # LP relaxation
     x_lp, lp_val = solve_lp_pulp(c, A, b, integer=False)
     if x_lp is None:
         return None, None, None
 
+    # R الأولي
     R_initial = compute_R(x_lp) if integer else 1.0
     R = R_initial if R_initial > 0 else 1.0
 
+    # حل ابتدائي
     if integer:
-        x = np.ones(n, dtype=int)
-        best = solve_lp_fixed_y_uflp(x, c, A)
+        x = np.zeros(n, dtype=int)
+        # نبدأ بصفر ثم نبحث عن حل أفضل
+        best_cost, _ = evaluate_solution(x, c, A, b, integer)
+        if best_cost == float('inf'):
+            x = np.round(x_lp).astype(int)
+            best_cost, _ = evaluate_solution(x, c, A, b, integer)
     else:
         x = x_lp.copy()
-        best = c @ x
+        best_cost = c @ x
 
     cycles_log = []
     gap_history = []
     R_history = []
-    diff_history = []
     no_improve = 0
     cycles_done = 0
     stop_reason = ""
     acceleration_active = False
+    cycle_times = []
 
     cost_repeat_count = 0
     gap_repeat_count = 0
     stable_gap_count = 0
     last_cost = None
     last_gap = None
+    last_R = None
     last_x = x.copy()
 
+    # عناصر عرض التقدم
     progress_bar = st.progress(0)
     status_placeholder = st.empty()
     details_placeholder = st.empty()
-    start_time = time.time()
+    start_total = time.time()
 
     for cycle in range(max_cycles):
+        cycle_start = time.time()
         current_R = R / (cycle + 1)
 
+        # اختيار مجموعة خشنة
         coarse = []
         if integer and x_lp is not None:
             open_now = np.where(x > 0.5)[0].tolist()
@@ -474,33 +447,14 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
                 importance.sort(key=lambda x: x[1], reverse=True)
                 coarse = [i for i, _ in importance[:10]]
 
-        if integer:
-            new_cost, new_x = vcycle(x, c, A, coarse, x_lp, current_R, integer=True)
-            gap = (new_cost - lp_val) / lp_val * 100 if lp_val != 0 else 0
-        else:
-            new_x = x.copy()
-            alpha = current_R / 5
-            dirs = np.random.randn(10, n)
-            dirs = dirs / (np.linalg.norm(dirs, axis=1, keepdims=True) + 1e-12)
-            best_local = c @ x
-            for u in dirs:
-                for sign in [1, -1]:
-                    x_cand = x + sign * alpha * u
-                    x_cand = np.maximum(x_cand, 0)
-                    if np.all(A @ x_cand <= b + 1e-6):
-                        cand_cost = c @ x_cand
-                        if cand_cost < best_local - 1e-6:
-                            best_local = cand_cost
-                            new_x = x_cand.copy()
-            new_cost = best_local
-            gap = (new_cost - lp_val) / lp_val * 100 if lp_val != 0 else 0
-
+        new_cost, new_x = vcycle(x, c, A, b, coarse, x_lp, current_R, integer=integer)
+        gap = (new_cost - lp_val) / lp_val * 100 if lp_val != 0 else 0
         R_val = compute_R(new_x) if integer else 0
         diff = np.linalg.norm(new_x - last_x)
 
-        improved = new_cost < best - 1e-6
+        improved = new_cost < best_cost - 1e-6
         if improved:
-            best = new_cost
+            best_cost = new_cost
             x = new_x
             no_improve = 0
         else:
@@ -508,7 +462,9 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
 
         gap_history.append(gap)
         R_history.append(R_val)
-        diff_history.append(diff)
+        cycle_time = time.time() - cycle_start
+        cycle_times.append(cycle_time)
+
         cycles_log.append({
             'cycle': cycle+1,
             'cost': new_cost,
@@ -516,34 +472,46 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
             'R': R_val,
             'diff': diff,
             'improved': improved,
-            'best_so_far': best
+            'best_so_far': best_cost,
+            'time': cycle_time
         })
 
+        # تحديث واجهة التقدم
         progress_bar.progress((cycle + 1) / max_cycles)
         status_placeholder.info(f"**Cycle {cycle+1} / {max_cycles}**")
         details_placeholder.markdown(
             f"**Current cost:** {new_cost:,.2f}  \n"
             f"**Gap:** {gap:.4f}%  \n"
-            f"**R (solution):** {R_val:.6f}  \n"
-            f"**R (LP-based):** {current_R:.6f}  \n"
+            f"**R:** {R_val:.6f}  \n"
             f"**Improved:** {'✅' if improved else '❌'}  \n"
-            f"**Best so far:** {best:,.2f}"
+            f"**Best so far:** {best_cost:,.2f}  \n"
+            f"**Cycle time:** {cycle_time:.3f}s"
         )
         time.sleep(0.1)
 
+        # تحديث حالة التسريع
         if integer and not acceleration_active and gap < 2.0 and R_val < 0.01:
             acceleration_active = True
             st.info(t('acceleration_on'))
         elif integer and acceleration_active and (gap >= 2.0 or R_val >= 0.01):
             acceleration_active = False
 
+        # معايير التوقف
         stop_now = False
+
         if no_improve >= patience:
             stop_reason = f"Patience ({patience} cycles without improvement)"
             stop_now = True
+
         if not stop_now and use_R and current_R < R_tol:
-            stop_reason = f"R (LP-based) < {R_tol}"
-            stop_now = True
+            if last_gap is not None and abs(gap - last_gap) < 1e-6:
+                stable_gap_count += 1
+                if stable_gap_count >= stable_gap_needed:
+                    stop_reason = f"R < {R_tol} and gap stable for {stable_gap_needed} cycles"
+                    stop_now = True
+            else:
+                stable_gap_count = 0
+
         if not stop_now and use_cost_repeat and last_cost is not None and abs(new_cost - last_cost) < 1e-6:
             cost_repeat_count += 1
             if cost_repeat_count >= cost_repeat_times:
@@ -551,6 +519,7 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
                 stop_now = True
         else:
             cost_repeat_count = 0
+
         if not stop_now and use_gap_repeat and last_gap is not None and abs(gap - last_gap) < 1e-6:
             gap_repeat_count += 1
             if gap_repeat_count >= gap_repeat_times:
@@ -558,12 +527,14 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
                 stop_now = True
         else:
             gap_repeat_count = 0
+
         if not stop_now and use_contraction and diff < diff_tol and current_R < R_tol:
             stop_reason = f"Contraction: diff < {diff_tol} and R < {R_tol}"
             stop_now = True
 
         last_cost = new_cost
         last_gap = gap
+        last_R = R_val
         last_x = new_x.copy()
 
         if stop_now:
@@ -574,26 +545,27 @@ def solve_general(c, A, b, problem_type='ILP', max_cycles=20, k_coarse=5, patien
         cycles_done = max_cycles
         stop_reason = f"Max cycles ({max_cycles}) reached"
 
-    total_time = time.time() - start_time
+    total_time = time.time() - start_total
     progress_bar.empty()
     status_placeholder.empty()
     details_placeholder.empty()
 
     return {
-        'best_cost': best,
+        'best_cost': best_cost,
         'lp_val': lp_val,
-        'gap': (best - lp_val) / lp_val * 100 if lp_val != 0 else 0,
+        'gap': (best_cost - lp_val) / lp_val * 100 if lp_val != 0 else 0,
         'cycles_done': cycles_done,
         'gap_history': gap_history,
         'R_history': R_history,
         'cycles_log': cycles_log,
-        'stop_reason': stop_reason,
+        'cycle_times': cycle_times,
         'total_time': total_time,
+        'stop_reason': stop_reason,
         'acceleration_active': acceleration_active
-    }, x, None
+    }, x
 
-# ------------------- دوال قراءة الملف -------------------
 def read_instance_from_text(text):
+    """قراءة مسألة عامة من نص"""
     lines = text.strip().splitlines()
     clean_lines = []
     for line in lines:
@@ -620,55 +592,10 @@ def read_instance_from_text(text):
         raise ValueError("عدد عناصر b لا يتطابق مع m")
     return c, A, b, n, m
 
-def read_uflp_from_text(text):
-    lines = text.strip().splitlines()
-    clean_lines = []
-    for line in lines:
-        line = line.strip()
-        if line and not line.startswith('#') and not line.startswith('!') and not line.upper().startswith('FILE:'):
-            clean_lines.append(line)
-    if len(clean_lines) < 2:
-        raise ValueError("الملف لا يحتوي على بيانات كافية.")
-    n, m = None, None
-    data_start = -1
-    for idx, line in enumerate(clean_lines):
-        parts = line.split()
-        if len(parts) >= 2:
-            try:
-                n_cand = int(parts[0])
-                m_cand = int(parts[1])
-                if n_cand > 0 and m_cand > 0:
-                    n, m = n_cand, m_cand
-                    data_start = idx
-                    break
-            except:
-                continue
-    if n is None or m is None:
-        raise ValueError("لم يتم العثور على سطر صالح يحتوي على n و m.")
-    f = np.zeros(n, dtype=float)
-    c = np.zeros((n, m), dtype=float)
-    for i in range(n):
-        if data_start + 1 + i >= len(clean_lines):
-            raise ValueError(f"الملف لا يحتوي على {n} سطراً من البيانات.")
-        line = clean_lines[data_start + 1 + i]
-        parts = line.split()
-        if len(parts) == 1 + m:
-            f[i] = float(parts[0])
-            for j in range(m):
-                c[i, j] = float(parts[1 + j])
-        elif len(parts) >= 2 + m:
-            idx = int(parts[0]) - 1
-            f[idx] = float(parts[1])
-            for j in range(m):
-                c[idx, j] = float(parts[2 + j])
-        else:
-            raise ValueError(f"السطر {data_start+1+i+1} لا يحتوي على العدد المناسب من القيم.")
-    return f, c, n, m
-
 def generate_random_instance(n, m):
     c = np.random.uniform(1, 10, n)
     A = np.random.uniform(0, 5, (m, n))
-    b = np.random.uniform(10, 50, m)
+    b = np.random.uniform(5, 20, m)
     return c, A, b
 
 # ------------------- واجهة Streamlit -------------------
@@ -680,15 +607,6 @@ with col2:
     st.session_state.language = language
 
 st.title(t('app_title'))
-
-st.markdown(f"""
-<div style="background-color: #ffeeee; padding: 20px; border-radius: 15px; text-align: center; margin: 20px 0; border: 3px solid red;">
-    <span style="color: red; font-size: 32px; font-weight: bold;">✉️ {CONTACT_EMAIL}</span><br>
-    <span style="color: red; font-size: 32px; font-weight: bold;">📞 {CONTACT_PHONE}</span><br>
-    <span style="color: red; font-size: 32px; font-weight: bold;">📠 {CONTACT_FAX}</span>
-</div>
-""", unsafe_allow_html=True)
-
 st.markdown(t('app_desc'))
 st.markdown(f"- {t('feature1')}\n- {t('feature2')}\n- {t('feature3')}\n- {t('feature4')}\n- {t('feature5')}\n- {t('feature6')}\n- {t('feature7')}")
 
@@ -745,16 +663,10 @@ with tab1:
             except:
                 text = uploaded_file.getvalue().decode("latin-1")
             try:
-                try:
-                    f, c_mat, n, m = read_uflp_from_text(text)
-                    A = c_mat
-                    b = np.ones(m)
-                    c_obj = f
-                except:
-                    c_obj, A, b, n, m = read_instance_from_text(text)
+                c, A, b, n, m = read_instance_from_text(text)
                 st.success(f"File loaded: {n} variables, {m} constraints")
-                result, x, _ = solve_general(
-                    c_obj, A, b, problem_type=('ILP' if is_integer else 'LP'),
+                result, x = solve_ahrh_general(
+                    c, A, b, integer=is_integer,
                     max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
                     use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
                     use_cost_repeat=use_cost_repeat, cost_repeat_times=cost_repeat_times,
@@ -777,9 +689,9 @@ with tab2:
         m_rand = st.number_input(t('random_m'), min_value=5, max_value=50, value=10, step=1, key="m_rand")
     if st.button(t('random_button'), key="gen_rand"):
         with st.spinner("Generating and solving..."):
-            c_rand, A_rand, b_rand = generate_random_instance(int(n_rand), int(m_rand))
-            result, x, _ = solve_general(
-                c_rand, A_rand, b_rand, problem_type=('ILP' if is_integer else 'LP'),
+            c, A, b = generate_random_instance(int(n_rand), int(m_rand))
+            result, x = solve_ahrh_general(
+                c, A, b, integer=is_integer,
                 max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
                 use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
                 use_cost_repeat=use_cost_repeat, cost_repeat_times=cost_repeat_times,
@@ -801,7 +713,7 @@ with tab3:
     with col2:
         m_man = st.number_input(t('manual_m'), min_value=1, max_value=10, value=3, step=1, key="m_man")
 
-    # تهيئة المصفوفات في session_state
+    # تخزين القيم في session_state
     if 'c_man' not in st.session_state or len(st.session_state.c_man) != n_man:
         st.session_state.c_man = np.zeros(n_man)
     if 'A_man' not in st.session_state or st.session_state.A_man.shape != (m_man, n_man):
@@ -838,9 +750,9 @@ with tab3:
 
     if st.button(t('solve_button'), key="solve_manual"):
         with st.spinner("Running algorithm..."):
-            result, x, _ = solve_general(
+            result, x = solve_ahrh_general(
                 st.session_state.c_man, st.session_state.A_man, st.session_state.b_man,
-                problem_type=('ILP' if is_integer else 'LP'),
+                integer=is_integer,
                 max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
                 use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
                 use_cost_repeat=use_cost_repeat, cost_repeat_times=cost_repeat_times,
@@ -865,11 +777,10 @@ if 'result' in st.session_state:
 
     colD, colE, colF = st.columns(3)
     colD.metric(t('cycles_done'), res['cycles_done'])
-    colE.metric(t('time'), f"{res['total_time']:.2f}")
+    colE.metric(t('total_time'), f"{res['total_time']:.2f}")
     colF.metric(t('size'), f"{st.session_state['n']}×{st.session_state['m']}")
 
     st.info(f"**{t('stop_reason')}:** {res['stop_reason']}")
-
     if res.get('acceleration_active'):
         st.success(t('acceleration_on'))
 
@@ -898,7 +809,8 @@ if 'result' in st.session_state:
             'R': 'R',
             'diff': 'Diff',
             'improved': t('improved'),
-            'best_so_far': t('best_so_far')
+            'best_so_far': t('best_so_far'),
+            'time': t('cycle_time')
         })
         df_cycles[t('improved')] = df_cycles[t('improved')].apply(lambda x: t('yes') if x else t('no'))
         st.dataframe(df_cycles, use_container_width=True)
