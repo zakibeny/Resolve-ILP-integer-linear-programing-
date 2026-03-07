@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-تطبيق AHRH المتكامل مع واجهة متعددة اللغات (عربي/إنجليزي/فرنسي)
-وتقنية التسريع التلقائي وعرض التطور خلال كل دورة
-نسخة مصححة بالكامل (إزالة الأحرف غير المطبوعة)
+تطبيق AHRH الكامل مع معلومات الاتصال باللون الأحمر وبحجم كبير
+وجميع الوظائف السابقة (عرض التقدم، معايير التوقف، اللغات، التوازي)
 """
 
 import streamlit as st
@@ -14,6 +13,11 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import warnings
 warnings.filterwarnings("ignore")
+
+# ------------------- معلومات الاتصال -------------------
+CONTACT_EMAIL = "zakibeny@gmail.com"
+CONTACT_PHONE = "0021355614305 / 00213779679073"
+CONTACT_FAX = "036495241"
 
 # ------------------- إعدادات التوازي -------------------
 NUM_WORKERS = 4
@@ -84,7 +88,7 @@ translations = {
         'no': 'لا',
         'download': '📥 تحميل التطور (CSV)',
         'info_placeholder': '👈 اختر مصدر المسألة من التبويبات أعلاه واضغط على زر التشغيل.',
-        'footer': 'تم التطوير بواسطة [اسمك] - خوارزمية AHRH محمية ببراءة اختراع.',
+        'footer': 'تم التطوير بواسطة Zakarya Benregreg - خوارزمية AHRH محمية ببراءة اختراع.',
         'optimal_achieved': '✅ الخوارزمية وصلت للحل الأمثل بالكامل!',
         'optimal_diff': '⚠️ الفرق عن الحل الأمثل',
         'acceleration_on': '⚡ وضع التسريع مُفعّل (فجوة < 2% و R < 0.01)',
@@ -154,7 +158,7 @@ translations = {
         'no': 'No',
         'download': '📥 Download Evolution (CSV)',
         'info_placeholder': '👈 Choose a data source and click the run button.',
-        'footer': 'Developed by [Your Name] - AHRH algorithm patented.',
+        'footer': 'Developed by Zakarya Benregreg - AHRH algorithm patented.',
         'optimal_achieved': '✅ Algorithm reached the optimal solution!',
         'optimal_diff': '⚠️ Difference from optimal',
         'acceleration_on': '⚡ Acceleration mode ON (gap < 2% and R < 0.01)',
@@ -224,7 +228,7 @@ translations = {
         'no': 'Non',
         'download': '📥 Télécharger l\'évolution (CSV)',
         'info_placeholder': '👈 Choisissez une source de données et cliquez sur le bouton.',
-        'footer': 'Développé par [Votre Nom] - Algorithme AHRH breveté.',
+        'footer': 'Développé par Zakarya Benregreg - Algorithme AHRH breveté.',
         'optimal_achieved': '✅ L\'algorithme a atteint la solution optimale !',
         'optimal_diff': '⚠️ Différence par rapport à l\'optimal',
         'acceleration_on': '⚡ Mode accélération ACTIVÉ (gap < 2% et R < 0.01)',
@@ -561,6 +565,7 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
     # عناصر عرض التقدم
     progress_bar = st.progress(0)
     status_placeholder = st.empty()
+    details_placeholder = st.empty()
 
     for cycle in range(max_cycles):
         if y_lp is not None:
@@ -607,14 +612,15 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
 
         # تحديث واجهة التقدم
         progress_bar.progress((cycle + 1) / max_cycles)
-        status_placeholder.info(
-            f"**Cycle {cycle+1}:**  "
-            f"Cost = {new_cost:,.2f}  |  "
-            f"Gap = {gap:.4f}%  |  "
-            f"R = {R_val:.6f}  |  "
-            f"Improved = {'✅' if improved else '❌'}  |  "
-            f"Best so far = {best:,.2f}"
+        status_placeholder.info(f"**Cycle {cycle+1} / {max_cycles}**")
+        details_placeholder.markdown(
+            f"**Current cost:** {new_cost:,.2f}  \n"
+            f"**Gap:** {gap:.4f}%  \n"
+            f"**R:** {R_val:.6f}  \n"
+            f"**Improved:** {'✅' if improved else '❌'}  \n"
+            f"**Best so far:** {best:,.2f}"
         )
+        time.sleep(0.1)
 
         # تحديث حالة التسريع
         if not acceleration_active and gap < 2.0 and R_val < 0.01:
@@ -680,6 +686,7 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
     # إزالة عناصر التقدم المؤقتة
     progress_bar.empty()
     status_placeholder.empty()
+    details_placeholder.empty()
 
     if acceleration_active:
         st.info(t('acceleration_on'))
@@ -707,8 +714,16 @@ with col2:
     st.session_state.language = language
 
 st.title(t('app_title'))
-# مربع نص في الأعلى لكتابة ملاحظات
-user_note = st.text_input("📝 Note / Remarque", placeholder="BENREGREG ZAKARYA", key="user_note_top")
+
+# ---------- معلومات الاتصال باللون الأحمر وبحجم كبير ----------
+st.markdown(f"""
+<div style="background-color: #ffeeee; padding: 20px; border-radius: 15px; text-align: center; margin: 20px 0; border: 3px solid red;">
+    <span style="color: red; font-size: 32px; font-weight: bold;">✉️ {CONTACT_EMAIL}</span><br>
+    <span style="color: red; font-size: 32px; font-weight: bold;">📞 {CONTACT_PHONE}</span><br>
+    <span style="color: red; font-size: 32px; font-weight: bold;">📠 {CONTACT_FAX}</span>
+</div>
+""", unsafe_allow_html=True)
+
 st.markdown(t('app_desc'))
 st.markdown(f"- {t('feature1')}\n- {t('feature2')}\n- {t('feature3')}\n- {t('feature4')}\n- {t('feature5')}\n- {t('feature6')}\n- {t('feature7')}")
 
