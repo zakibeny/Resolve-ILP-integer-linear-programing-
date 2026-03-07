@@ -2,7 +2,7 @@
 """
 تطبيق AHRH لحل مسائل البرمجة الخطية (صحيحة أو مستمرة)
 مع واجهة متعددة اللغات وعرض تطور الدورات والزمن
-نسخة محسنة ومعممة
+نسخة محسنة مع إضافة معلومات الاتصال باللون الأحمر
 """
 
 import streamlit as st
@@ -14,6 +14,11 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import warnings
 warnings.filterwarnings("ignore")
+
+# ------------------- معلومات الاتصال -------------------
+CONTACT_EMAIL = "zakibeny@gmail.com"
+CONTACT_PHONE = "0021355614305 / 00213779679073"
+CONTACT_FAX = "036495241"
 
 # ------------------- إعدادات التوازي -------------------
 NUM_WORKERS = 4
@@ -246,7 +251,6 @@ if 'language' not in st.session_state:
 
 # ------------------- دوال أساسية للمسائل الخطية -------------------
 def solve_lp_pulp(c, A, b, integer=False):
-    """حل مسألة LP أو ILP باستخدام pulp"""
     n = len(c)
     m = len(b)
     prob = pulp.LpProblem("LP", pulp.LpMinimize)
@@ -267,7 +271,6 @@ def solve_lp_pulp(c, A, b, integer=False):
         return None, None
 
 def compute_R(x):
-    """نصف القطر R: أقصى مسافة إلى التكامل"""
     fractional = np.abs(x - np.round(x))
     return np.max(fractional)
 
@@ -293,7 +296,6 @@ def generate_biased_directions(y_lp, frac_idx, count, alpha, bias_strength=0.5):
     return np.array(dirs)
 
 def evaluate_solution(x, c, A, b, integer):
-    """تقييم حل: حساب التكلفة والتحقق من الجدوى"""
     if integer:
         x_int = np.round(x).astype(int)
     else:
@@ -303,43 +305,12 @@ def evaluate_solution(x, c, A, b, integer):
     else:
         return float('inf'), None
 
-def local_search_advanced(y, best_cost, c, A, b, max_iter=5):
-    """بحث محلي للمتغيرات الصحيحة (تبادل 1-1)"""
-    n = len(y)
-    improved = True
-    iteration = 0
-    best_y = y.copy()
-    best = best_cost
-
-    while improved and iteration < max_iter:
-        improved = False
-        ones = np.where(best_y > 0.5)[0].tolist()
-        zeros = np.where(best_y < 0.5)[0].tolist()
-        for i in ones:
-            for j in zeros:
-                y_new = best_y.copy()
-                y_new[i] = 0
-                y_new[j] = 1
-                cost, _ = evaluate_solution(y_new, c, A, b, integer=True)
-                if cost < best - 1e-6:
-                    best = cost
-                    best_y = y_new
-                    improved = True
-                    ones = np.where(best_y > 0.5)[0].tolist()
-                    zeros = np.where(best_y < 0.5)[0].tolist()
-                    break
-            if improved:
-                break
-        iteration += 1
-    return best, best_y
-
 def vcycle(y, c, A, b, coarse, y_lp, R, integer=True):
-    """دورة V واحدة"""
     n = len(y)
     y_smooth = y.copy()
     best_cost, _ = evaluate_solution(y, c, A, b, integer)
     if best_cost == float('inf'):
-        best_cost = c @ y  # fallback
+        best_cost = c @ y
 
     alpha = R / 5
     frac_idx = np.where((y > 0.01) & (y < 0.99))[0] if integer else list(range(n))
@@ -359,7 +330,6 @@ def vcycle(y, c, A, b, coarse, y_lp, R, integer=True):
                 best_cost = cost
                 y_smooth = y_full.copy()
 
-    # تصحيح خشن (للمسائل الصحيحة فقط)
     if integer and len(coarse) > 0:
         y_coarse = y_smooth.copy()
         ones = np.where(y_coarse > 0.5)[0].tolist()
@@ -384,23 +354,18 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
                        use_cost_repeat=False, cost_repeat_times=2,
                        use_gap_repeat=False, gap_repeat_times=2,
                        use_contraction=False, diff_tol=1e-12):
-    """الدالة الرئيسية لحل أي مسألة LP/ILP"""
     n = len(c)
     m = len(b)
 
-    # LP relaxation
     x_lp, lp_val = solve_lp_pulp(c, A, b, integer=False)
     if x_lp is None:
         return None, None, None
 
-    # R الأولي
     R_initial = compute_R(x_lp) if integer else 1.0
     R = R_initial if R_initial > 0 else 1.0
 
-    # حل ابتدائي
     if integer:
         x = np.zeros(n, dtype=int)
-        # نبدأ بصفر ثم نبحث عن حل أفضل
         best_cost, _ = evaluate_solution(x, c, A, b, integer)
         if best_cost == float('inf'):
             x = np.round(x_lp).astype(int)
@@ -426,7 +391,6 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
     last_R = None
     last_x = x.copy()
 
-    # عناصر عرض التقدم
     progress_bar = st.progress(0)
     status_placeholder = st.empty()
     details_placeholder = st.empty()
@@ -436,7 +400,6 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
         cycle_start = time.time()
         current_R = R / (cycle + 1)
 
-        # اختيار مجموعة خشنة
         coarse = []
         if integer and x_lp is not None:
             open_now = np.where(x > 0.5)[0].tolist()
@@ -476,7 +439,6 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
             'time': cycle_time
         })
 
-        # تحديث واجهة التقدم
         progress_bar.progress((cycle + 1) / max_cycles)
         status_placeholder.info(f"**Cycle {cycle+1} / {max_cycles}**")
         details_placeholder.markdown(
@@ -489,14 +451,12 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
         )
         time.sleep(0.1)
 
-        # تحديث حالة التسريع
         if integer and not acceleration_active and gap < 2.0 and R_val < 0.01:
             acceleration_active = True
             st.info(t('acceleration_on'))
         elif integer and acceleration_active and (gap >= 2.0 or R_val >= 0.01):
             acceleration_active = False
 
-        # معايير التوقف
         stop_now = False
 
         if no_improve >= patience:
@@ -564,8 +524,56 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
         'acceleration_active': acceleration_active
     }, x
 
-def read_instance_from_text(text):
-    """قراءة مسألة عامة من نص"""
+# ------------------- دالة قراءة ملفات UFLP (من النسخة القديمة) -------------------
+def read_uflp_instance(text):
+    """قراءة ملفات UFLP (مثل gs250) بنفس الطريقة الناجحة سابقًا"""
+    lines = text.strip().splitlines()
+    clean_lines = []
+    for line in lines:
+        line = line.strip()
+        if line and not line.startswith('#') and not line.startswith('!') and not line.upper().startswith('FILE:'):
+            clean_lines.append(line)
+    if len(clean_lines) < 2:
+        raise ValueError("الملف لا يحتوي على بيانات كافية.")
+    n, m = None, None
+    data_start = -1
+    for idx, line in enumerate(clean_lines):
+        parts = line.split()
+        if len(parts) >= 2:
+            try:
+                n_cand = int(parts[0])
+                m_cand = int(parts[1])
+                if n_cand > 0 and m_cand > 0:
+                    n, m = n_cand, m_cand
+                    data_start = idx
+                    break
+            except:
+                continue
+    if n is None or m is None:
+        raise ValueError("لم يتم العثور على سطر صالح يحتوي على n و m.")
+    f = np.zeros(n, dtype=float)
+    c = np.zeros((n, m), dtype=float)
+    for i in range(n):
+        if data_start + 1 + i >= len(clean_lines):
+            raise ValueError(f"الملف لا يحتوي على {n} سطراً من البيانات.")
+        line = clean_lines[data_start + 1 + i]
+        parts = line.split()
+        if len(parts) == 1 + m:
+            f[i] = float(parts[0])
+            for j in range(m):
+                c[i, j] = float(parts[1 + j])
+        elif len(parts) >= 2 + m:
+            idx = int(parts[0]) - 1
+            f[idx] = float(parts[1])
+            for j in range(m):
+                c[idx, j] = float(parts[2 + j])
+        else:
+            raise ValueError(f"السطر {data_start+1+i+1} لا يحتوي على العدد المناسب من القيم.")
+    return f, c, n, m
+
+# ------------------- دالة قراءة مسائل عامة -------------------
+def read_general_instance(text):
+    """قراءة مسألة عامة بصيغة: السطر الأول n m، الثاني c، ثم A سطرًا سطرًا، ثم b"""
     lines = text.strip().splitlines()
     clean_lines = []
     for line in lines:
@@ -592,6 +600,21 @@ def read_instance_from_text(text):
         raise ValueError("عدد عناصر b لا يتطابق مع m")
     return c, A, b, n, m
 
+def read_any_instance(text):
+    """محاولة قراءة الملف بأي صيغة (UFLP أولاً ثم عامة)"""
+    try:
+        f, c_mat, n, m = read_uflp_instance(text)
+        # تحويل UFLP إلى صيغة عامة (f كهدف، c_mat كـ A، و b كمتجه من الآحاد)
+        c = f
+        A = c_mat
+        b = np.ones(m)  # في UFLP كل عميل يطلب وحدة واحدة
+        return c, A, b, n, m
+    except:
+        try:
+            return read_general_instance(text)
+        except Exception as e:
+            raise ValueError(f"لا يمكن قراءة الملف: {e}")
+
 def generate_random_instance(n, m):
     c = np.random.uniform(1, 10, n)
     A = np.random.uniform(0, 5, (m, n))
@@ -607,6 +630,16 @@ with col2:
     st.session_state.language = language
 
 st.title(t('app_title'))
+
+# ---------- معلومات الاتصال باللون الأحمر وبحجم كبير ----------
+st.markdown(f"""
+<div style="background-color: #ffeeee; padding: 20px; border-radius: 15px; text-align: center; margin: 20px 0; border: 3px solid red;">
+    <span style="color: red; font-size: 32px; font-weight: bold;">✉️ {CONTACT_EMAIL}</span><br>
+    <span style="color: red; font-size: 32px; font-weight: bold;">📞 {CONTACT_PHONE}</span><br>
+    <span style="color: red; font-size: 32px; font-weight: bold;">📠 {CONTACT_FAX}</span>
+</div>
+""", unsafe_allow_html=True)
+
 st.markdown(t('app_desc'))
 st.markdown(f"- {t('feature1')}\n- {t('feature2')}\n- {t('feature3')}\n- {t('feature4')}\n- {t('feature5')}\n- {t('feature6')}\n- {t('feature7')}")
 
@@ -663,7 +696,7 @@ with tab1:
             except:
                 text = uploaded_file.getvalue().decode("latin-1")
             try:
-                c, A, b, n, m = read_instance_from_text(text)
+                c, A, b, n, m = read_any_instance(text)
                 st.success(f"File loaded: {n} variables, {m} constraints")
                 result, x = solve_ahrh_general(
                     c, A, b, integer=is_integer,
@@ -713,7 +746,6 @@ with tab3:
     with col2:
         m_man = st.number_input(t('manual_m'), min_value=1, max_value=10, value=3, step=1, key="m_man")
 
-    # تخزين القيم في session_state
     if 'c_man' not in st.session_state or len(st.session_state.c_man) != n_man:
         st.session_state.c_man = np.zeros(n_man)
     if 'A_man' not in st.session_state or st.session_state.A_man.shape != (m_man, n_man):
