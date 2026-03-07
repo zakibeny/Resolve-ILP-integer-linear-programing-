@@ -1,8 +1,7 @@
-       # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
-تطبيق AHRH الكامل مع معلومات الاتصال باللون الأحمر وبحجم كبير
-وجميع الوظائف السابقة (عرض التقدم، معايير التوقف، اللغات، التوازي)
-نسخة نهائية بدون أخطاء
+تطبيق AHRH الكامل مع معلومات الاتصال وعرض التقدم في كل دورة
+نسخة محسنة مع إضافة total_time وإصلاح الأخطاء المحتملة
 """
 
 import streamlit as st
@@ -552,6 +551,7 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
 
     y = np.ones(n, dtype=int)
     best = solve_lp_fixed_y_uflp(y, f, c)
+    st.write(f"**التكلفة الأولية (فتح الكل):** {best:.2f}")  # للتأكد من البداية
 
     cycles_log = []
     gap_history = []
@@ -574,6 +574,8 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
     progress_bar = st.progress(0)
     status_placeholder = st.empty()
     details_placeholder = st.empty()
+
+    start_time = time.time()  # بدء قياس الزمن
 
     for cycle in range(max_cycles):
         if y_lp is not None:
@@ -691,6 +693,8 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
         cycles_done = max_cycles
         stop_reason = f"Max cycles ({max_cycles}) reached"
 
+    total_time = time.time() - start_time  # حساب الزمن الإجمالي
+
     # إزالة عناصر التقدم المؤقتة
     progress_bar.empty()
     status_placeholder.empty()
@@ -710,7 +714,8 @@ def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
         'diff_history': diff_history,
         'cycles_log': cycles_log,
         'stop_reason': stop_reason,
-        'acceleration_active': acceleration_active
+        'acceleration_active': acceleration_active,
+        'total_time': total_time  # إضافة الزمن إلى النتائج
     }
 
 # ------------------- واجهة Streamlit -------------------
@@ -888,7 +893,7 @@ if 'result' in st.session_state:
 
     colE, colF, colG = st.columns(3)
     colE.metric(t('cycles_done'), res['cycles_done'])
-    colF.metric(t('time'), f"{res.get('total_time', 0):.2f}")
+    colF.metric(t('time'), f"{res['total_time']:.2f}")  # استخدام total_time
     colG.metric(t('size'), f"{st.session_state['n']}×{st.session_state['m']}")
 
     st.info(f"**{t('stop_reason')}:** {res['stop_reason']}")
