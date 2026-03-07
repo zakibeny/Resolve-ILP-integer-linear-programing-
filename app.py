@@ -2,7 +2,7 @@
 """
 تطبيق AHRH لحل مسائل البرمجة الخطية (صحيحة أو مستمرة)
 مع واجهة متعددة اللغات وعرض تطور الدورات والزمن
-نسخة محسنة مع إضافة معلومات الاتصال باللون الأحمر
+نسخة تجمع بين ILP و LP مع الحفاظ على استقرار UFLP
 """
 
 import streamlit as st
@@ -77,8 +77,7 @@ translations = {
         'lp_val': 'قيمة LP',
         'gap': 'الفجوة',
         'cycles_done': 'عدد الدورات',
-        'cycle_time': 'زمن الدورة (ث)',
-        'total_time': 'الزمن الإجمالي (ث)',
+        'time': 'الزمن (ث)',
         'size': 'حجم المسألة',
         'stop_reason': 'سبب التوقف',
         'gap_plot': '📈 تطور الفجوة و R خلال الدورات',
@@ -149,8 +148,7 @@ translations = {
         'lp_val': 'LP Value',
         'gap': 'Gap',
         'cycles_done': 'Cycles Done',
-        'cycle_time': 'Cycle Time (s)',
-        'total_time': 'Total Time (s)',
+        'time': 'Time (s)',
         'size': 'Problem Size',
         'stop_reason': 'Stop Reason',
         'gap_plot': '📈 Gap & R Evolution',
@@ -221,8 +219,7 @@ translations = {
         'lp_val': 'Valeur LP',
         'gap': 'Écart',
         'cycles_done': 'Cycles effectués',
-        'cycle_time': 'Temps par cycle (s)',
-        'total_time': 'Temps total (s)',
+        'time': 'Temps (s)',
         'size': 'Taille du problème',
         'stop_reason': 'Raison de l\'arrêt',
         'gap_plot': '📈 Évolution du gap et de R',
@@ -249,8 +246,9 @@ def t(key):
 if 'language' not in st.session_state:
     st.session_state.language = 'English'
 
-# ------------------- دوال أساسية للمسائل الخطية -------------------
+# ------------------- دوال الخوارزمية الأساسية -------------------
 def solve_lp_pulp(c, A, b, integer=False):
+    """حل مسألة LP أو ILP باستخدام pulp (للحصول على LP relaxation)"""
     n = len(c)
     m = len(b)
     prob = pulp.LpProblem("LP", pulp.LpMinimize)
@@ -271,6 +269,7 @@ def solve_lp_pulp(c, A, b, integer=False):
         return None, None
 
 def compute_R(x):
+    """نصف القطر R: أقصى مسافة إلى التكامل (للمتغيرات الصحيحة)"""
     fractional = np.abs(x - np.round(x))
     return np.max(fractional)
 
@@ -296,8 +295,10 @@ def generate_biased_directions(y_lp, frac_idx, count, alpha, bias_strength=0.5):
     return np.array(dirs)
 
 def evaluate_solution(x, c, A, b, integer):
+    """تقييم حل: حساب التكلفة والتحقق من الجدوى"""
     if integer:
         x_int = np.round(x).astype(int)
+        x_int = np.maximum(x_int, 0)  # نضمن non-negativity
     else:
         x_int = x
     if np.all(A @ x_int <= b + 1e-6) and np.all(x_int >= 0):
@@ -306,6 +307,7 @@ def evaluate_solution(x, c, A, b, integer):
         return float('inf'), None
 
 def vcycle(y, c, A, b, coarse, y_lp, R, integer=True):
+    """دورة V واحدة للمسائل الخطية (صحيحة أو مستمرة)"""
     n = len(y)
     y_smooth = y.copy()
     best_cost, _ = evaluate_solution(y, c, A, b, integer)
@@ -323,6 +325,7 @@ def vcycle(y, c, A, b, coarse, y_lp, R, integer=True):
             y_cand = y[frac_idx] + sign * alpha * u
             if integer:
                 y_cand = np.round(y_cand).astype(int)
+                y_cand = np.maximum(y_cand, 0)
             y_full = y.copy()
             y_full[frac_idx] = y_cand
             cost, feasible = evaluate_solution(y_full, c, A, b, integer)
@@ -357,6 +360,7 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
     n = len(c)
     m = len(b)
 
+    # LP relaxation
     x_lp, lp_val = solve_lp_pulp(c, A, b, integer=False)
     if x_lp is None:
         return None, None, None
@@ -381,7 +385,6 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
     cycles_done = 0
     stop_reason = ""
     acceleration_active = False
-    cycle_times = []
 
     cost_repeat_count = 0
     gap_repeat_count = 0
@@ -394,10 +397,9 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
     progress_bar = st.progress(0)
     status_placeholder = st.empty()
     details_placeholder = st.empty()
-    start_total = time.time()
+    start_time = time.time()
 
     for cycle in range(max_cycles):
-        cycle_start = time.time()
         current_R = R / (cycle + 1)
 
         coarse = []
@@ -425,9 +427,6 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
 
         gap_history.append(gap)
         R_history.append(R_val)
-        cycle_time = time.time() - cycle_start
-        cycle_times.append(cycle_time)
-
         cycles_log.append({
             'cycle': cycle+1,
             'cost': new_cost,
@@ -435,8 +434,7 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
             'R': R_val,
             'diff': diff,
             'improved': improved,
-            'best_so_far': best_cost,
-            'time': cycle_time
+            'best_so_far': best_cost
         })
 
         progress_bar.progress((cycle + 1) / max_cycles)
@@ -446,8 +444,7 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
             f"**Gap:** {gap:.4f}%  \n"
             f"**R:** {R_val:.6f}  \n"
             f"**Improved:** {'✅' if improved else '❌'}  \n"
-            f"**Best so far:** {best_cost:,.2f}  \n"
-            f"**Cycle time:** {cycle_time:.3f}s"
+            f"**Best so far:** {best_cost:,.2f}"
         )
         time.sleep(0.1)
 
@@ -505,10 +502,13 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
         cycles_done = max_cycles
         stop_reason = f"Max cycles ({max_cycles}) reached"
 
-    total_time = time.time() - start_total
+    total_time = time.time() - start_time
     progress_bar.empty()
     status_placeholder.empty()
     details_placeholder.empty()
+
+    if acceleration_active:
+        st.info(t('acceleration_on'))
 
     return {
         'best_cost': best_cost,
@@ -518,15 +518,13 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
         'gap_history': gap_history,
         'R_history': R_history,
         'cycles_log': cycles_log,
-        'cycle_times': cycle_times,
-        'total_time': total_time,
         'stop_reason': stop_reason,
-        'acceleration_active': acceleration_active
+        'total_time': total_time
     }, x
 
-# ------------------- دالة قراءة ملفات UFLP (من النسخة القديمة) -------------------
+# ------------------- دوال قراءة الملفات -------------------
 def read_uflp_instance(text):
-    """قراءة ملفات UFLP (مثل gs250) بنفس الطريقة الناجحة سابقًا"""
+    """قراءة ملفات UFLP (مثل gs250)"""
     lines = text.strip().splitlines()
     clean_lines = []
     for line in lines:
@@ -571,7 +569,6 @@ def read_uflp_instance(text):
             raise ValueError(f"السطر {data_start+1+i+1} لا يحتوي على العدد المناسب من القيم.")
     return f, c, n, m
 
-# ------------------- دالة قراءة مسائل عامة -------------------
 def read_general_instance(text):
     """قراءة مسألة عامة بصيغة: السطر الأول n m، الثاني c، ثم A سطرًا سطرًا، ثم b"""
     lines = text.strip().splitlines()
@@ -607,7 +604,7 @@ def read_any_instance(text):
         # تحويل UFLP إلى صيغة عامة (f كهدف، c_mat كـ A، و b كمتجه من الآحاد)
         c = f
         A = c_mat
-        b = np.ones(m)  # في UFLP كل عميل يطلب وحدة واحدة
+        b = np.ones(m)
         return c, A, b, n, m
     except:
         try:
@@ -631,7 +628,7 @@ with col2:
 
 st.title(t('app_title'))
 
-# ---------- معلومات الاتصال باللون الأحمر وبحجم كبير ----------
+# معلومات الاتصال
 st.markdown(f"""
 <div style="background-color: #ffeeee; padding: 20px; border-radius: 15px; text-align: center; margin: 20px 0; border: 3px solid red;">
     <span style="color: red; font-size: 32px; font-weight: bold;">✉️ {CONTACT_EMAIL}</span><br>
@@ -809,7 +806,7 @@ if 'result' in st.session_state:
 
     colD, colE, colF = st.columns(3)
     colD.metric(t('cycles_done'), res['cycles_done'])
-    colE.metric(t('total_time'), f"{res['total_time']:.2f}")
+    colE.metric(t('time'), f"{res['total_time']:.2f}")
     colF.metric(t('size'), f"{st.session_state['n']}×{st.session_state['m']}")
 
     st.info(f"**{t('stop_reason')}:** {res['stop_reason']}")
@@ -841,14 +838,23 @@ if 'result' in st.session_state:
             'R': 'R',
             'diff': 'Diff',
             'improved': t('improved'),
-            'best_so_far': t('best_so_far'),
-            'time': t('cycle_time')
+            'best_so_far': t('best_so_far')
         })
         df_cycles[t('improved')] = df_cycles[t('improved')].apply(lambda x: t('yes') if x else t('no'))
         st.dataframe(df_cycles, use_container_width=True)
 
-        csv = df_cycles.to_csv(index=False)
-        st.download_button(t('download'), data=csv, file_name="cycle_log.csv", mime="text/csv")
+        df = pd.DataFrame({
+            t('cycle'): cycles,
+            t('gap_label'): res['gap_history'],
+            'R': res['R_history']
+        })
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label=t('download'),
+            data=csv,
+            file_name="evolution.csv",
+            mime="text/csv"
+        )
 else:
     st.info(t('info_placeholder'))
 
