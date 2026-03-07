@@ -1,4 +1,3 @@
-```python
 # -*- coding: utf-8 -*-
 """
 تطبيق AHRH لحل مسائل UFLP فقط
