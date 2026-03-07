@@ -3,7 +3,10 @@
 تطبيق AHRH الكامل مع معلومات الاتصال باللون الأحمر وبحجم كبير
 وجميع الوظائف السابقة (عرض التقدم، معايير التوقف، اللغات، التوازي)
 """
-
+print("f[:5]:", f[:5])
+print("c[:5, :5]:", c[:5, :5])
+print("LP value:", lp_val)
+print("Initial cost (all open):", best)
 import streamlit as st
 import numpy as np
 import pulp
