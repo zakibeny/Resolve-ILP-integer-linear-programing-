@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-تطبيق AHRH لحل مسائل البرمجة الخطية (صحيحة أو مستمرة)
-مع واجهة متعددة اللغات وعرض تطور الدورات والزمن
-نسخة تجمع بين ILP و LP مع الحفاظ على استقرار UFLP
+تطبيق AHRH لحل مسائل UFLP والمسائل الخطية العامة (LP/ILP)
+مع التمييز بين رفع ملفات UFLP والملفات العامة
 """
 
 import streamlit as st
@@ -38,6 +37,9 @@ translations = {
         'problem_type': 'نوع المسألة',
         'lp': 'برمجة خطية مستمرة (LP)',
         'ilp': 'برمجة خطية صحيحة (ILP)',
+        'file_type': 'نوع الملف',
+        'uflp': 'ملف UFLP (مثل gs250)',
+        'general': 'ملف عام (c, A, b)',
         'sidebar_algo': '⚙️ معاملات الخوارزمية',
         'max_cycles': 'عدد الدورات الأقصى',
         'k_coarse': 'حجم المجموعة الخشنة (k)',
@@ -76,6 +78,7 @@ translations = {
         'best_cost': 'أفضل تكلفة',
         'lp_val': 'قيمة LP',
         'gap': 'الفجوة',
+        'open_fac': 'المرافق المفتوحة',
         'cycles_done': 'عدد الدورات',
         'time': 'الزمن (ث)',
         'size': 'حجم المسألة',
@@ -109,6 +112,9 @@ translations = {
         'problem_type': 'Problem Type',
         'lp': 'Linear Programming (LP)',
         'ilp': 'Integer Linear Programming (ILP)',
+        'file_type': 'File Type',
+        'uflp': 'UFLP file (e.g., gs250)',
+        'general': 'General file (c, A, b)',
         'sidebar_algo': '⚙️ Algorithm Parameters',
         'max_cycles': 'Max Cycles',
         'k_coarse': 'Coarse Set Size (k)',
@@ -147,6 +153,7 @@ translations = {
         'best_cost': 'Best Cost',
         'lp_val': 'LP Value',
         'gap': 'Gap',
+        'open_fac': 'Open Facilities',
         'cycles_done': 'Cycles Done',
         'time': 'Time (s)',
         'size': 'Problem Size',
@@ -180,6 +187,9 @@ translations = {
         'problem_type': 'Type de problème',
         'lp': 'Programmation linéaire (LP)',
         'ilp': 'Programmation linéaire en nombres entiers (ILP)',
+        'file_type': 'Type de fichier',
+        'uflp': 'Fichier UFLP (ex. gs250)',
+        'general': 'Fichier général (c, A, b)',
         'sidebar_algo': '⚙️ Paramètres de l\'algorithme',
         'max_cycles': 'Cycles max',
         'k_coarse': 'Taille de l\'ensemble grossier (k)',
@@ -218,6 +228,7 @@ translations = {
         'best_cost': 'Meilleur coût',
         'lp_val': 'Valeur LP',
         'gap': 'Écart',
+        'open_fac': 'Sites ouverts',
         'cycles_done': 'Cycles effectués',
         'time': 'Temps (s)',
         'size': 'Taille du problème',
@@ -246,32 +257,40 @@ def t(key):
 if 'language' not in st.session_state:
     st.session_state.language = 'English'
 
-# ------------------- دوال الخوارزمية الأساسية -------------------
-def solve_lp_pulp(c, A, b, integer=False):
-    """حل مسألة LP أو ILP باستخدام pulp (للحصول على LP relaxation)"""
-    n = len(c)
-    m = len(b)
-    prob = pulp.LpProblem("LP", pulp.LpMinimize)
-    if integer:
-        x = [pulp.LpVariable(f"x_{i}", lowBound=0, cat='Integer') for i in range(n)]
-    else:
-        x = [pulp.LpVariable(f"x_{i}", lowBound=0, cat='Continuous') for i in range(n)]
-    prob += pulp.lpSum(c[i] * x[i] for i in range(n))
-    for j in range(m):
-        prob += pulp.lpSum(A[j][i] * x[i] for i in range(n)) <= b[j]
-    solver = pulp.PULP_CBC_CMD(msg=False)
-    prob.solve(solver)
-    if prob.status == pulp.LpStatusOptimal:
-        x_val = np.array([pulp.value(x[i]) for i in range(n)])
-        obj_val = pulp.value(prob.objective)
-        return x_val, obj_val
-    else:
-        return None, None
+# ------------------- دوال UFLP (النسخة القديمة) -------------------
+def solve_lp_fixed_y_uflp(y_int, f, c):
+    open_fac = np.where(y_int > 0.5)[0]
+    if len(open_fac) == 0:
+        return float('inf')
+    total = np.sum(f[open_fac])
+    for j in range(c.shape[1]):
+        total += min(c[i, j] for i in open_fac)
+    return total
 
-def compute_R(x):
-    """نصف القطر R: أقصى مسافة إلى التكامل (للمتغيرات الصحيحة)"""
-    fractional = np.abs(x - np.round(x))
-    return np.max(fractional)
+def lp_relaxation_uflp(f, c):
+    n, m = len(f), c.shape[1]
+    lp = pulp.LpProblem("UFLP_LP_Relax", pulp.LpMinimize)
+    y = [pulp.LpVariable(f"y_{i}", 0, 1) for i in range(n)]
+    x = {(i, j): pulp.LpVariable(f"x_{i}_{j}", 0) for i in range(n) for j in range(m)}
+    lp += pulp.lpSum(f[i] * y[i] for i in range(n)) + pulp.lpSum(c[i, j] * x[(i, j)] for i in range(n) for j in range(m))
+    for j in range(m):
+        lp += pulp.lpSum(x[(i, j)] for i in range(n)) == 1
+    for i in range(n):
+        for j in range(m):
+            lp += x[(i, j)] <= y[i]
+    solver = pulp.PULP_CBC_CMD(msg=False)
+    lp.solve(solver)
+    if lp.status == 1:
+        y_val = np.array([pulp.value(y[i]) for i in range(n)])
+        obj = pulp.value(lp.objective)
+        return y_val, obj
+    return None, None
+
+def get_fractional_indices(y, eps=0.01):
+    return np.where((y > eps) & (y < 1 - eps))[0]
+
+def compute_R(y):
+    return np.max(np.minimum(np.abs(y), np.abs(1 - y)))
 
 def generate_biased_directions(y_lp, frac_idx, count, alpha, bias_strength=0.5):
     n_free = len(frac_idx)
@@ -294,11 +313,386 @@ def generate_biased_directions(y_lp, frac_idx, count, alpha, bias_strength=0.5):
         dirs.append(u)
     return np.array(dirs)
 
+def hierarchical_radial_scan_parallel(y_center, R, n_free, f, c, best_cost, best_y,
+                                      n_layers=2, dirs_per_layer=10, alpha_schedule='adaptive',
+                                      y_lp=None, gap_threshold=5.0):
+    frac_idx = get_fractional_indices(y_center)
+    if len(frac_idx) == 0:
+        return best_cost, best_y
+    y_frac = y_center[frac_idx].copy()
+    n_free_actual = len(frac_idx)
+    local_best = best_cost
+    local_best_y = best_y
+    base_alpha = R / (np.sqrt(n_free) + 1e-12) if n_free > 0 else 0.1
+
+    for layer in range(1, n_layers + 1):
+        if alpha_schedule == 'adaptive':
+            alpha_k = base_alpha * np.exp(- (layer - 1) / n_layers)
+        else:
+            alpha_k = (layer / n_layers) * base_alpha
+        if hasattr(st.session_state, 'acceleration') and st.session_state.acceleration:
+            dirs_count = max(2, dirs_per_layer // 2)
+        else:
+            dirs_count = max(3, dirs_per_layer // 2)
+        dirs = generate_biased_directions(y_lp, frac_idx, dirs_count, alpha_k, bias_strength=0.5)
+
+        def evaluate_direction(u):
+            best_loc = local_best
+            best_loc_y = local_best_y
+            for sign in [1, -1]:
+                y_cand = y_frac + sign * alpha_k * u
+                y_cand_int = (y_cand > 0.5).astype(int)
+                y_full = y_center.copy()
+                y_full[frac_idx] = y_cand_int
+                y_int = np.round(y_full).astype(int)
+                cost = solve_lp_fixed_y_uflp(y_int, f, c)
+                if cost < best_loc:
+                    best_loc = cost
+                    best_loc_y = y_int.copy()
+            return best_loc, best_loc_y
+
+        with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+            futures = [executor.submit(evaluate_direction, dirs[i]) for i in range(dirs_count)]
+            for future in as_completed(futures):
+                cost, y_cand = future.result()
+                if cost < local_best:
+                    local_best = cost
+                    local_best_y = y_cand
+        y_center = local_best_y.copy()
+        y_frac = y_center[frac_idx].copy()
+    return local_best, local_best_y
+
+def smooth(y, f, c, y_lp=None, iters=1, gap_threshold=5.0):
+    best = solve_lp_fixed_y_uflp(y, f, c)
+    best_y = y.copy()
+    for _ in range(iters):
+        R_val = compute_R(y)
+        n_free = len(get_fractional_indices(y))
+        new_cost, new_y = hierarchical_radial_scan_parallel(
+            y, R_val, n_free, f, c, best, best_y,
+            n_layers=2, dirs_per_layer=8, alpha_schedule='adaptive',
+            y_lp=y_lp, gap_threshold=gap_threshold
+        )
+        if new_cost < best:
+            best = new_cost
+            best_y = new_y
+        else:
+            break
+    return best, best_y
+
+def local_search_advanced(y, best_cost, f, c, max_iter=10):
+    n = len(f)
+    improved = True
+    iteration = 0
+    best_y = y.copy()
+    best = best_cost
+
+    while improved and iteration < max_iter:
+        improved = False
+        open_fac = np.where(best_y > 0.5)[0].tolist()
+        closed_fac = np.where(best_y < 0.5)[0].tolist()
+
+        # 1-1 exchange
+        for i in open_fac:
+            for j in closed_fac:
+                y_new = best_y.copy()
+                y_new[i] = 0
+                y_new[j] = 1
+                cost = solve_lp_fixed_y_uflp(y_new, f, c)
+                if cost < best:
+                    best = cost
+                    best_y = y_new
+                    improved = True
+                    open_fac = np.where(best_y > 0.5)[0].tolist()
+                    closed_fac = np.where(best_y < 0.5)[0].tolist()
+                    break
+            if improved:
+                break
+
+        if not improved and len(open_fac) >= 2 and len(closed_fac) >= 1:
+            # 2-1 exchange
+            for i1 in range(len(open_fac)):
+                for i2 in range(i1+1, len(open_fac)):
+                    for j in closed_fac:
+                        y_new = best_y.copy()
+                        y_new[open_fac[i1]] = 0
+                        y_new[open_fac[i2]] = 0
+                        y_new[j] = 1
+                        cost = solve_lp_fixed_y_uflp(y_new, f, c)
+                        if cost < best:
+                            best = cost
+                            best_y = y_new
+                            improved = True
+                            break
+                    if improved: break
+                if improved: break
+
+        if not improved and len(open_fac) >= 1 and len(closed_fac) >= 2:
+            # 1-2 exchange
+            for i in open_fac:
+                for j1 in range(len(closed_fac)):
+                    for j2 in range(j1+1, len(closed_fac)):
+                        y_new = best_y.copy()
+                        y_new[i] = 0
+                        y_new[closed_fac[j1]] = 1
+                        y_new[closed_fac[j2]] = 1
+                        cost = solve_lp_fixed_y_uflp(y_new, f, c)
+                        if cost < best:
+                            best = cost
+                            best_y = y_new
+                            improved = True
+                            break
+                    if improved: break
+                if improved: break
+
+        if not improved and len(open_fac) >= 2 and len(closed_fac) >= 2:
+            # 2-2 exchange
+            for i1 in range(len(open_fac)):
+                for i2 in range(i1+1, len(open_fac)):
+                    for j1 in range(len(closed_fac)):
+                        for j2 in range(j1+1, len(closed_fac)):
+                            y_new = best_y.copy()
+                            y_new[open_fac[i1]] = 0
+                            y_new[open_fac[i2]] = 0
+                            y_new[closed_fac[j1]] = 1
+                            y_new[closed_fac[j2]] = 1
+                            cost = solve_lp_fixed_y_uflp(y_new, f, c)
+                            if cost < best:
+                                best = cost
+                                best_y = y_new
+                                improved = True
+                                break
+                        if improved: break
+                    if improved: break
+                if improved: break
+
+        iteration += 1
+
+    return best, best_y
+
+def vcycle(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
+    cost1, y1 = smooth(y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
+    if not coarse:
+        return cost1, y1
+    best = cost1
+    best_y = y1
+    n_coarse = len(coarse)
+
+    def evaluate_bits(bits):
+        yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])
+        y_full = y1.copy()
+        for idx, val in zip(coarse, yc):
+            y_full[idx] = val
+        cost = solve_lp_fixed_y_uflp(y_full, f, c)
+        return cost, y_full
+
+    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        futures = [executor.submit(evaluate_bits, bits) for bits in range(1 << n_coarse)]
+        for future in as_completed(futures):
+            cost, y_cand = future.result()
+            if cost < best:
+                best = cost
+                best_y = y_cand
+    cost2, y2 = smooth(best_y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
+    cost3, y3 = local_search_advanced(y2, cost2, f, c, max_iter=5)
+    return cost3, y3
+
+def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
+                    use_R, R_tol, stable_gap_needed,
+                    use_cost_repeat, cost_repeat_times,
+                    use_gap_repeat, gap_repeat_times,
+                    use_contraction, diff_tol):
+    n, m = len(f), c.shape[1]
+    y_lp, lp_val = lp_relaxation_uflp(f, c)
+    if lp_val is None:
+        lp_val = float('inf')
+
+    y = np.ones(n, dtype=int)
+    best = solve_lp_fixed_y_uflp(y, f, c)
+
+    cycles_log = []
+    gap_history = []
+    R_history = []
+    diff_history = []
+    no_improve = 0
+    cycles_done = 0
+    stop_reason = ""
+    acceleration_active = False
+
+    cost_repeat_count = 0
+    gap_repeat_count = 0
+    stable_gap_count = 0
+    last_cost = None
+    last_gap = None
+    last_R = None
+    last_y = y.copy()
+
+    progress_bar = st.progress(0)
+    status_placeholder = st.empty()
+    details_placeholder = st.empty()
+    start_time = time.time()
+
+    for cycle in range(max_cycles):
+        if y_lp is not None:
+            open_now = np.where(y > 0.5)[0].tolist()
+            top_lp = np.argsort(-y_lp)[:k_coarse].tolist()
+            coarse = list(set(open_now + top_lp))
+            if len(coarse) > 10:
+                importance = [(i, y_lp[i]) for i in coarse]
+                importance.sort(key=lambda x: x[1], reverse=True)
+                coarse = [i for i, _ in importance[:10]]
+        else:
+            coarse = []
+
+        if acceleration_active:
+            st.session_state.acceleration = True
+        else:
+            st.session_state.acceleration = False
+
+        new_cost, new_y = vcycle(y, f, c, coarse, y_lp=y_lp, gap_threshold=3.0)
+        gap = (new_cost - lp_val) / lp_val * 100 if lp_val != float('inf') else 0
+        R_val = compute_R(new_y)
+        diff = np.linalg.norm(new_y - last_y)
+
+        improved = new_cost < best - 1e-6
+        if improved:
+            best = new_cost
+            y = new_y
+            no_improve = 0
+        else:
+            no_improve += 1
+
+        gap_history.append(gap)
+        R_history.append(R_val)
+        diff_history.append(diff)
+        cycles_log.append({
+            'cycle': cycle+1,
+            'cost': new_cost,
+            'gap': gap,
+            'R': R_val,
+            'diff': diff,
+            'improved': improved,
+            'best_so_far': best
+        })
+
+        progress_bar.progress((cycle + 1) / max_cycles)
+        status_placeholder.info(f"**Cycle {cycle+1} / {max_cycles}**")
+        details_placeholder.markdown(
+            f"**Current cost:** {new_cost:,.2f}  \n"
+            f"**Gap:** {gap:.4f}%  \n"
+            f"**R:** {R_val:.6f}  \n"
+            f"**Improved:** {'✅' if improved else '❌'}  \n"
+            f"**Best so far:** {best:,.2f}"
+        )
+        time.sleep(0.1)
+
+        if not acceleration_active and gap < 2.0 and R_val < 0.01:
+            acceleration_active = True
+            st.session_state.acceleration = True
+            st.info(t('acceleration_on'))
+        elif acceleration_active and (gap >= 2.0 or R_val >= 0.01):
+            acceleration_active = False
+            st.session_state.acceleration = False
+
+        stop_now = False
+
+        if no_improve >= patience:
+            stop_reason = f"Patience ({patience} cycles without improvement)"
+            stop_now = True
+
+        if not stop_now and use_R and R_val < R_tol:
+            if last_gap is not None and abs(gap - last_gap) < 1e-6:
+                stable_gap_count += 1
+                if stable_gap_count >= stable_gap_needed:
+                    stop_reason = f"R < {R_tol} and gap stable for {stable_gap_needed} cycles"
+                    stop_now = True
+            else:
+                stable_gap_count = 0
+
+        if not stop_now and use_cost_repeat:
+            if last_cost is not None and abs(new_cost - last_cost) < 1e-6:
+                cost_repeat_count += 1
+                if cost_repeat_count >= cost_repeat_times:
+                    stop_reason = f"Cost repeated {cost_repeat_times} times"
+                    stop_now = True
+            else:
+                cost_repeat_count = 0
+
+        if not stop_now and use_gap_repeat:
+            if last_gap is not None and abs(gap - last_gap) < 1e-6:
+                gap_repeat_count += 1
+                if gap_repeat_count >= gap_repeat_times:
+                    stop_reason = f"Gap repeated {gap_repeat_times} times"
+                    stop_now = True
+            else:
+                gap_repeat_count = 0
+
+        if not stop_now and use_contraction:
+            if diff < diff_tol and R_val < R_tol:
+                stop_reason = f"Contraction: diff < {diff_tol} and R < {R_tol}"
+                stop_now = True
+
+        last_cost = new_cost
+        last_gap = gap
+        last_R = R_val
+        last_y = new_y.copy()
+
+        if stop_now:
+            cycles_done = cycle + 1
+            break
+
+    if cycles_done == 0:
+        cycles_done = max_cycles
+        stop_reason = f"Max cycles ({max_cycles}) reached"
+
+    total_time = time.time() - start_time
+    progress_bar.empty()
+    status_placeholder.empty()
+    details_placeholder.empty()
+
+    if acceleration_active:
+        st.info(t('acceleration_on'))
+
+    return {
+        'best_cost': best,
+        'lp_val': lp_val,
+        'gap': (best - lp_val) / lp_val * 100 if lp_val != float('inf') else 0,
+        'open_fac': len(np.where(y > 0.5)[0]),
+        'cycles_done': cycles_done,
+        'gap_history': gap_history,
+        'R_history': R_history,
+        'diff_history': diff_history,
+        'cycles_log': cycles_log,
+        'stop_reason': stop_reason,
+        'acceleration_active': acceleration_active,
+        'total_time': total_time
+    }
+
+# ------------------- دوال المسائل العامة (LP/ILP) -------------------
+def solve_lp_pulp(c, A, b, integer=False):
+    n = len(c)
+    m = len(b)
+    prob = pulp.LpProblem("LP", pulp.LpMinimize)
+    if integer:
+        x = [pulp.LpVariable(f"x_{i}", lowBound=0, cat='Integer') for i in range(n)]
+    else:
+        x = [pulp.LpVariable(f"x_{i}", lowBound=0, cat='Continuous') for i in range(n)]
+    prob += pulp.lpSum(c[i] * x[i] for i in range(n))
+    for j in range(m):
+        prob += pulp.lpSum(A[j][i] * x[i] for i in range(n)) <= b[j]
+    solver = pulp.PULP_CBC_CMD(msg=False)
+    prob.solve(solver)
+    if prob.status == pulp.LpStatusOptimal:
+        x_val = np.array([pulp.value(x[i]) for i in range(n)])
+        obj_val = pulp.value(prob.objective)
+        return x_val, obj_val
+    else:
+        return None, None
+
 def evaluate_solution(x, c, A, b, integer):
-    """تقييم حل: حساب التكلفة والتحقق من الجدوى"""
     if integer:
         x_int = np.round(x).astype(int)
-        x_int = np.maximum(x_int, 0)  # نضمن non-negativity
+        x_int = np.maximum(x_int, 0)
     else:
         x_int = x
     if np.all(A @ x_int <= b + 1e-6) and np.all(x_int >= 0):
@@ -306,8 +700,7 @@ def evaluate_solution(x, c, A, b, integer):
     else:
         return float('inf'), None
 
-def vcycle(y, c, A, b, coarse, y_lp, R, integer=True):
-    """دورة V واحدة للمسائل الخطية (صحيحة أو مستمرة)"""
+def vcycle_general(y, c, A, b, coarse, y_lp, R, integer=True):
     n = len(y)
     y_smooth = y.copy()
     best_cost, _ = evaluate_solution(y, c, A, b, integer)
@@ -360,7 +753,6 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
     n = len(c)
     m = len(b)
 
-    # LP relaxation
     x_lp, lp_val = solve_lp_pulp(c, A, b, integer=False)
     if x_lp is None:
         return None, None, None
@@ -412,7 +804,7 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
                 importance.sort(key=lambda x: x[1], reverse=True)
                 coarse = [i for i, _ in importance[:10]]
 
-        new_cost, new_x = vcycle(x, c, A, b, coarse, x_lp, current_R, integer=integer)
+        new_cost, new_x = vcycle_general(x, c, A, b, coarse, x_lp, current_R, integer=integer)
         gap = (new_cost - lp_val) / lp_val * 100 if lp_val != 0 else 0
         R_val = compute_R(new_x) if integer else 0
         diff = np.linalg.norm(new_x - last_x)
@@ -523,8 +915,7 @@ def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patienc
     }, x
 
 # ------------------- دوال قراءة الملفات -------------------
-def read_uflp_instance(text):
-    """قراءة ملفات UFLP (مثل gs250)"""
+def read_uflp_file(text):
     lines = text.strip().splitlines()
     clean_lines = []
     for line in lines:
@@ -569,8 +960,7 @@ def read_uflp_instance(text):
             raise ValueError(f"السطر {data_start+1+i+1} لا يحتوي على العدد المناسب من القيم.")
     return f, c, n, m
 
-def read_general_instance(text):
-    """قراءة مسألة عامة بصيغة: السطر الأول n m، الثاني c، ثم A سطرًا سطرًا، ثم b"""
+def read_general_file(text):
     lines = text.strip().splitlines()
     clean_lines = []
     for line in lines:
@@ -596,21 +986,6 @@ def read_general_instance(text):
     if len(b) != m:
         raise ValueError("عدد عناصر b لا يتطابق مع m")
     return c, A, b, n, m
-
-def read_any_instance(text):
-    """محاولة قراءة الملف بأي صيغة (UFLP أولاً ثم عامة)"""
-    try:
-        f, c_mat, n, m = read_uflp_instance(text)
-        # تحويل UFLP إلى صيغة عامة (f كهدف، c_mat كـ A، و b كمتجه من الآحاد)
-        c = f
-        A = c_mat
-        b = np.ones(m)
-        return c, A, b, n, m
-    except:
-        try:
-            return read_general_instance(text)
-        except Exception as e:
-            raise ValueError(f"لا يمكن قراءة الملف: {e}")
 
 def generate_random_instance(n, m):
     c = np.random.uniform(1, 10, n)
@@ -677,6 +1052,7 @@ with st.sidebar:
     st.markdown("---")
     st.write(f"{t('workers')}: {NUM_WORKERS}")
 
+# اختيار نوع المسألة للمدخلات اليدوية والعشوائية
 problem_type = st.radio(t('problem_type'), [t('lp'), t('ilp')])
 is_integer = (problem_type == t('ilp'))
 
@@ -685,6 +1061,11 @@ tab1, tab2, tab3 = st.tabs([t('tab_upload'), t('tab_random'), t('tab_manual')])
 with tab1:
     st.header(t('upload_header'))
     st.info(t('upload_info'))
+    
+    # اختيار نوع الملف
+    file_type = st.radio(t('file_type'), [t('uflp'), t('general')])
+    is_uflp = (file_type == t('uflp'))
+    
     uploaded_file = st.file_uploader(t('choose_file'), type=None)
     if uploaded_file is not None:
         with st.spinner("Reading file and running algorithm..."):
@@ -693,20 +1074,38 @@ with tab1:
             except:
                 text = uploaded_file.getvalue().decode("latin-1")
             try:
-                c, A, b, n, m = read_any_instance(text)
-                st.success(f"File loaded: {n} variables, {m} constraints")
-                result, x = solve_ahrh_general(
-                    c, A, b, integer=is_integer,
-                    max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
-                    use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
-                    use_cost_repeat=use_cost_repeat, cost_repeat_times=cost_repeat_times,
-                    use_gap_repeat=use_gap_repeat, gap_repeat_times=gap_repeat_times,
-                    use_contraction=use_contraction, diff_tol=diff_tol
-                )
-                if result:
-                    st.session_state['result'] = result
-                    st.session_state['n'] = n
-                    st.session_state['m'] = m
+                if is_uflp:
+                    # معالجة ملف UFLP باستخدام الدالة الخاصة
+                    f, c_mat, n, m = read_uflp_file(text)
+                    result = solve_ahrh_uflp(
+                        f, c_mat,
+                        max_cycles, k_coarse, patience,
+                        use_R, R_tol, stable_gap_needed,
+                        use_cost_repeat, cost_repeat_times,
+                        use_gap_repeat, gap_repeat_times,
+                        use_contraction, diff_tol
+                    )
+                    st.success(f"File loaded: {n} facilities, {m} customers")
+                    if result:
+                        st.session_state['result'] = result
+                        st.session_state['n'] = n
+                        st.session_state['m'] = m
+                else:
+                    # معالجة ملف عام
+                    c, A, b, n, m = read_general_file(text)
+                    st.success(f"File loaded: {n} variables, {m} constraints")
+                    result, x = solve_ahrh_general(
+                        c, A, b, integer=is_integer,
+                        max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
+                        use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
+                        use_cost_repeat=use_cost_repeat, cost_repeat_times=cost_repeat_times,
+                        use_gap_repeat=use_gap_repeat, gap_repeat_times=gap_repeat_times,
+                        use_contraction=use_contraction, diff_tol=diff_tol
+                    )
+                    if result:
+                        st.session_state['result'] = result
+                        st.session_state['n'] = n
+                        st.session_state['m'] = m
             except Exception as e:
                 st.error(f"Error reading file: {e}")
 
@@ -799,15 +1198,23 @@ st.header(t('results'))
 
 if 'result' in st.session_state:
     res = st.session_state['result']
-    colA, colB, colC = st.columns(3)
-    colA.metric(t('best_cost'), f"{res['best_cost']:,.2f}")
-    colB.metric(t('lp_val'), f"{res['lp_val']:,.2f}")
-    colC.metric(t('gap'), f"{res['gap']:.4f}%")
+    # نتائج UFLP تحتوي على open_fac، نتائج عامة لا تحتوي
+    if 'open_fac' in res:
+        colA, colB, colC, colD = st.columns(4)
+        colA.metric(t('best_cost'), f"{res['best_cost']:,.0f}")
+        colB.metric(t('lp_val'), f"{res['lp_val']:,.0f}")
+        colC.metric(t('gap'), f"{res['gap']:.4f}%")
+        colD.metric(t('open_fac'), res['open_fac'])
+    else:
+        colA, colB, colC = st.columns(3)
+        colA.metric(t('best_cost'), f"{res['best_cost']:,.2f}")
+        colB.metric(t('lp_val'), f"{res['lp_val']:,.2f}")
+        colC.metric(t('gap'), f"{res['gap']:.4f}%")
 
-    colD, colE, colF = st.columns(3)
-    colD.metric(t('cycles_done'), res['cycles_done'])
-    colE.metric(t('time'), f"{res['total_time']:.2f}")
-    colF.metric(t('size'), f"{st.session_state['n']}×{st.session_state['m']}")
+    colE, colF, colG = st.columns(3)
+    colE.metric(t('cycles_done'), res['cycles_done'])
+    colF.metric(t('time'), f"{res['total_time']:.2f}")
+    colG.metric(t('size'), f"{st.session_state['n']}×{st.session_state['m']}")
 
     st.info(f"**{t('stop_reason')}:** {res['stop_reason']}")
     if res.get('acceleration_active'):
