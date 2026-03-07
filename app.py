@@ -1,9 +1,9 @@
-
+```python
 # -*- coding: utf-8 -*-
 """
-تطبيق AHRH الكامل: حل مسائل UFLP والمسائل الخطية العامة (LP/ILP)
+تطبيق AHRH لحل مسائل UFLP فقط
 مع واجهة متعددة اللغات، عرض التقدم، معايير توقف متعددة، وإرسال التعليقات إلى GitHub Issues
-(نسخة واحدة متكاملة - جميع الميزات السابقة + إضافة الإرسال)
+(نسخة مبسطة ومخصصة لـ UFLP - تم إزالة LP العام)
 """
 
 import streamlit as st
@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import warnings
 warnings.filterwarnings("ignore")
 
-# ------------------- معلومات الاتصال (تظهر في أعلى الصفحة) -------------------
+# ------------------- معلومات الاتصال -------------------
 CONTACT_EMAIL = "zakibeny@gmail.com"
 CONTACT_PHONE = "0021355614305 / 00213779679073"
 CONTACT_FAX = "036495241"
@@ -39,47 +39,6 @@ translations = {
         'feature5': 'توازي الحسابات لتسريع الأداء',
         'feature6': 'معايير توقف متعددة قابلة للاختيار',
         'feature7': 'وضع التسريع التلقائي عندما تقترب الفجوة من 2%',
-        'problem_type': 'نوع المسألة',
-        'lp': 'برمجة خطية مستمرة (LP)',
-        'ilp': 'برمجة خطية صحيحة (ILP)',
-        'file_type': 'نوع الملف',
-        'uflp': 'ملف UFLP (مسألة مواقع المرافق)',
-        'general': 'ملف عام (دالة هدف + قيود)',
-        'file_format_help': '📄 شرح تنسيق الملفات',
-        'uflp_format': """
-**تنسيق ملف UFLP (مثل gs250, capb):**
-- السطر الأول: `n m 0` حيث n عدد المواقع، m عدد العملاء.
-- ثم n سطر، كل سطر يمثل موقعاً: `[رقم الموقع] [تكلفة الفتح] [تكلفة النقل إلى العميل 1] [تكلفة النقل إلى العميل 2] ... [تكلفة النقل إلى العميل m]`
-- مثال:
-```
-
-5 3 0
-1 100 5 6 7
-2 150 8 9 10
-3 120 4 5 6
-4 130 7 8 9
-5 110 3 4 5
-
-```
-- يتم تجاهل الأسطر التي تبدأ بـ # أو ! أو FILE:.
-""",
-        'general_format': """
-**تنسيق الملف العام (لأي مسألة LP/ILP):**
-- السطر الأول: `n m` حيث n عدد المتغيرات، m عدد القيود.
-- السطر الثاني: قيم معاملات الهدف `c` (n قيمة مفصولة بمسافات).
-- ثم m سطر، كل سطر يمثل قيود `A` (n قيمة لكل سطر).
-- السطر الأخير: قيم الطرف الأيمن `b` (m قيمة مفصولة بمسافات).
-- مثال (مسألة صغيرة):
-```
-
-2 1
-1 2
-1 2
-3
-
-```
-  تمثل: min x + 2y, subject to x + 2y <= 3, x,y >=0
-""",
         'sidebar_algo': '⚙️ معاملات الخوارزمية',
         'max_cycles': 'عدد الدورات الأقصى',
         'k_coarse': 'حجم المجموعة الخشنة (k)',
@@ -100,19 +59,18 @@ translations = {
         'tab_random': '🎲 توليد عشوائي',
         'tab_manual': '✍️ إدخال يدوي',
         'upload_header': 'رفع ملف المسألة',
-        'upload_info': 'يدعم أي ملف نصي (txt, dat, bub, opt, ...). يتم تجاهل الأسطر التي تبدأ بـ # أو ! أو FILE:',
+        'upload_info': 'يدعم ملفات UFLP بصيغة OR-Library (txt, dat, bub, opt, ...). يتم تجاهل الأسطر التي تبدأ بـ # أو ! أو FILE:',
         'choose_file': 'اختر ملف المسألة',
-        'random_header': 'توليد مسألة عشوائية',
-        'random_n': 'عدد المتغيرات (n)',
-        'random_m': 'عدد القيود (m)',
+        'random_header': 'توليد مسألة UFLP عشوائية',
+        'random_n': 'عدد المواقع (n)',
+        'random_m': 'عدد العملاء (m)',
         'random_button': '🎲 توليد وحل',
         'manual_header': 'إدخال بيانات المسألة يدويًا',
         'manual_warning': 'للمسائل الصغيرة فقط (n ≤ 10, m ≤ 10)',
-        'manual_n': 'عدد المتغيرات (n)',
-        'manual_m': 'عدد القيود (m)',
-        'manual_c': 'معاملات الهدف c[i]',
-        'manual_A': 'مصفوفة القيود A[i][j]',
-        'manual_b': 'الطرف الأيمن b[i]',
+        'manual_n': 'عدد المواقع (n)',
+        'manual_m': 'عدد العملاء (m)',
+        'manual_f': 'تكاليف فتح المرافق f[i]',
+        'manual_c': 'تكاليف النقل c[i][j]',
         'solve_button': '🚀 حل المسألة المدخلة',
         'results': '📊 النتائج',
         'best_cost': 'أفضل تكلفة',
@@ -156,47 +114,6 @@ translations = {
         'feature5': 'Parallel computing for speed',
         'feature6': 'Multiple customizable stopping criteria',
         'feature7': 'Automatic acceleration mode when gap approaches 2%',
-        'problem_type': 'Problem Type',
-        'lp': 'Linear Programming (LP)',
-        'ilp': 'Integer Linear Programming (ILP)',
-        'file_type': 'File Type',
-        'uflp': 'UFLP file (Facility Location)',
-        'general': 'General file (Objective + Constraints)',
-        'file_format_help': '📄 File Format Help',
-        'uflp_format': """
-**UFLP File Format (e.g., gs250, capb):**
-- First line: `n m 0` where n = number of facilities, m = number of customers.
-- Then n lines, each representing a facility: `[facility index] [opening cost] [transport cost to customer 1] [transport cost to customer 2] ... [transport cost to customer m]`
-- Example:
-```
-
-5 3 0
-1 100 5 6 7
-2 150 8 9 10
-3 120 4 5 6
-4 130 7 8 9
-5 110 3 4 5
-
-```
-- Lines starting with #, !, or FILE: are ignored.
-""",
-        'general_format': """
-**General File Format (for any LP/ILP problem):**
-- First line: `n m` where n = number of variables, m = number of constraints.
-- Second line: objective coefficients `c` (n space-separated values).
-- Then m lines, each representing a constraint `A` (n values per line).
-- Last line: right-hand side `b` (m space-separated values).
-- Example (small problem):
-```
-
-2 1
-1 2
-1 2
-3
-
-```
-  Represents: min x + 2y, subject to x + 2y <= 3, x,y >=0
-""",
         'sidebar_algo': '⚙️ Algorithm Parameters',
         'max_cycles': 'Max Cycles',
         'k_coarse': 'Coarse Set Size (k)',
@@ -216,20 +133,19 @@ translations = {
         'tab_upload': '📂 Upload File',
         'tab_random': '🎲 Random Generation',
         'tab_manual': '✍️ Manual Input',
-        'upload_header': 'Upload Problem File',
-        'upload_info': 'Accepts any text file (txt, dat, bub, opt, ...). Lines starting with #, !, or FILE: are ignored.',
+        'upload_header': 'Upload UFLP Problem File',
+        'upload_info': 'Accepts UFLP files in OR-Library format (txt, dat, bub, opt, ...). Lines starting with #, !, or FILE: are ignored.',
         'choose_file': 'Choose a file',
-        'random_header': 'Generate Random Instance',
-        'random_n': 'Number of variables (n)',
-        'random_m': 'Number of constraints (m)',
+        'random_header': 'Generate Random UFLP Instance',
+        'random_n': 'Number of facilities (n)',
+        'random_m': 'Number of customers (m)',
         'random_button': '🎲 Generate and Solve',
         'manual_header': 'Manual Data Entry',
         'manual_warning': 'For small problems only (n ≤ 10, m ≤ 10)',
-        'manual_n': 'Number of variables (n)',
-        'manual_m': 'Number of constraints (m)',
-        'manual_c': 'Objective coefficients c[i]',
-        'manual_A': 'Constraint matrix A[i][j]',
-        'manual_b': 'Right-hand side b[i]',
+        'manual_n': 'Number of facilities (n)',
+        'manual_m': 'Number of customers (m)',
+        'manual_f': 'Facility opening costs f[i]',
+        'manual_c': 'Transportation costs c[i][j]',
         'solve_button': '🚀 Solve Entered Problem',
         'results': '📊 Results',
         'best_cost': 'Best Cost',
@@ -273,47 +189,6 @@ translations = {
         'feature5': 'Calcul parallèle pour la rapidité',
         'feature6': 'Critères d\'arrêt multiples personnalisables',
         'feature7': 'Mode accélération automatique lorsque le gap approche 2%',
-        'problem_type': 'Type de problème',
-        'lp': 'Programmation linéaire (LP)',
-        'ilp': 'Programmation linéaire en nombres entiers (ILP)',
-        'file_type': 'Type de fichier',
-        'uflp': 'Fichier UFLP (Localisation d\'installations)',
-        'general': 'Fichier général (Objectif + Contraintes)',
-        'file_format_help': '📄 Aide sur le format des fichiers',
-        'uflp_format': """
-**Format du fichier UFLP (ex. gs250, capb):**
-- Première ligne : `n m 0` où n = nombre de sites, m = nombre de clients.
-- Ensuite n lignes, chacune représentant un site : `[indice du site] [coût d\'ouverture] [coût de transport vers client 1] [coût de transport vers client 2] ... [coût de transport vers client m]`
-- Exemple :
-```
-
-5 3 0
-1 100 5 6 7
-2 150 8 9 10
-3 120 4 5 6
-4 130 7 8 9
-5 110 3 4 5
-
-```
-- Les lignes commençant par #, ! ou FILE: sont ignorées.
-""",
-        'general_format': """
-**Format du fichier général (pour tout problème LP/ILP):**
-- Première ligne : `n m` où n = nombre de variables, m = nombre de contraintes.
-- Deuxième ligne : coefficients objectifs `c` (n valeurs séparées par des espaces).
-- Ensuite m lignes, chacune représentant une contrainte `A` (n valeurs par ligne).
-- Dernière ligne : second membre `b` (m valeurs séparées par des espaces).
-- Exemple (petit problème) :
-```
-
-2 1
-1 2
-1 2
-3
-
-```
-  Représente : min x + 2y, sujet à x + 2y <= 3, x,y >=0
-""",
         'sidebar_algo': '⚙️ Paramètres de l\'algorithme',
         'max_cycles': 'Cycles max',
         'k_coarse': 'Taille de l\'ensemble grossier (k)',
@@ -333,20 +208,19 @@ translations = {
         'tab_upload': '📂 Télécharger un fichier',
         'tab_random': '🎲 Génération aléatoire',
         'tab_manual': '✍️ Saisie manuelle',
-        'upload_header': 'Télécharger le fichier problème',
-        'upload_info': 'Accepte tout fichier texte (txt, dat, bub, opt, ...). Les lignes commençant par #, ! ou FILE: sont ignorées.',
+        'upload_header': 'Télécharger un fichier UFLP',
+        'upload_info': 'Accepte les fichiers UFLP au format OR-Library (txt, dat, bub, opt, ...). Les lignes commençant par #, ! ou FILE: sont ignorées.',
         'choose_file': 'Choisir un fichier',
-        'random_header': 'Générer une instance aléatoire',
-        'random_n': 'Nombre de variables (n)',
-        'random_m': 'Nombre de contraintes (m)',
+        'random_header': 'Générer une instance UFLP aléatoire',
+        'random_n': 'Nombre de sites (n)',
+        'random_m': 'Nombre de clients (m)',
         'random_button': '🎲 Générer et résoudre',
         'manual_header': 'Saisie manuelle des données',
         'manual_warning': 'Pour petits problèmes uniquement (n ≤ 10, m ≤ 10)',
-        'manual_n': 'Nombre de variables (n)',
-        'manual_m': 'Nombre de contraintes (m)',
-        'manual_c': 'Coefficients objectifs c[i]',
-        'manual_A': 'Matrice des contraintes A[i][j]',
-        'manual_b': 'Second membre b[i]',
+        'manual_n': 'Nombre de sites (n)',
+        'manual_m': 'Nombre de clients (m)',
+        'manual_f': 'Coûts d\'ouverture f[i]',
+        'manual_c': 'Coûts de transport c[i][j]',
         'solve_button': '🚀 Résoudre le problème saisi',
         'results': '📊 Résultats',
         'best_cost': 'Meilleur coût',
@@ -799,253 +673,7 @@ def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
         'total_time': total_time
     }
 
-# ------------------- دوال المسائل العامة (LP/ILP) -------------------
-def solve_lp_pulp(c, A, b, integer=False):
-    n = len(c)
-    m = len(b)
-    prob = pulp.LpProblem("LP", pulp.LpMinimize)
-    if integer:
-        x = [pulp.LpVariable(f"x_{i}", lowBound=0, cat='Integer') for i in range(n)]
-    else:
-        x = [pulp.LpVariable(f"x_{i}", lowBound=0, cat='Continuous') for i in range(n)]
-    prob += pulp.lpSum(c[i] * x[i] for i in range(n))
-    for j in range(m):
-        prob += pulp.lpSum(A[j][i] * x[i] for i in range(n)) <= b[j]
-    solver = pulp.PULP_CBC_CMD(msg=False)
-    prob.solve(solver)
-    if prob.status == pulp.LpStatusOptimal:
-        x_val = np.array([pulp.value(x[i]) for i in range(n)])
-        obj_val = pulp.value(prob.objective)
-        return x_val, obj_val
-    else:
-        return None, None
-
-def evaluate_solution(x, c, A, b, integer):
-    if integer:
-        x_int = np.round(x).astype(int)
-        x_int = np.maximum(x_int, 0)
-    else:
-        x_int = x
-    if np.all(A @ x_int <= b + 1e-6) and np.all(x_int >= 0):
-        return c @ x_int, x_int
-    else:
-        return float('inf'), None
-
-def vcycle_general(y, c, A, b, coarse, y_lp, R, integer=True):
-    n = len(y)
-    y_smooth = y.copy()
-    best_cost, _ = evaluate_solution(y, c, A, b, integer)
-    if best_cost == float('inf'):
-        best_cost = c @ y
-
-    alpha = R / 5
-    frac_idx = np.where((y > 0.01) & (y < 0.99))[0] if integer else list(range(n))
-    if len(frac_idx) == 0:
-        frac_idx = list(range(n))
-
-    dirs = generate_biased_directions(y_lp, frac_idx, 10, alpha, bias_strength=0.5)
-    for u in dirs:
-        for sign in [1, -1]:
-            y_cand = y[frac_idx] + sign * alpha * u
-            if integer:
-                y_cand = np.round(y_cand).astype(int)
-                y_cand = np.maximum(y_cand, 0)
-            y_full = y.copy()
-            y_full[frac_idx] = y_cand
-            cost, feasible = evaluate_solution(y_full, c, A, b, integer)
-            if feasible is not None and cost < best_cost - 1e-6:
-                best_cost = cost
-                y_smooth = y_full.copy()
-
-    if integer and len(coarse) > 0:
-        y_coarse = y_smooth.copy()
-        ones = np.where(y_coarse > 0.5)[0].tolist()
-        zeros = np.where(y_coarse < 0.5)[0].tolist()
-        for i in ones:
-            if i not in coarse:
-                continue
-            for j in zeros:
-                if j not in coarse:
-                    continue
-                y_new = y_coarse.copy()
-                y_new[i] = 0
-                y_new[j] = 1
-                cost, feasible = evaluate_solution(y_new, c, A, b, integer)
-                if feasible is not None and cost < best_cost - 1e-6:
-                    best_cost = cost
-                    y_smooth = y_new.copy()
-    return best_cost, y_smooth
-
-def solve_ahrh_general(c, A, b, integer=True, max_cycles=20, k_coarse=5, patience=5,
-                       use_R=False, R_tol=1e-6, stable_gap_needed=2,
-                       use_cost_repeat=False, cost_repeat_times=2,
-                       use_gap_repeat=False, gap_repeat_times=2,
-                       use_contraction=False, diff_tol=1e-12):
-    n = len(c)
-    m = len(b)
-
-    x_lp, lp_val = solve_lp_pulp(c, A, b, integer=False)
-    if x_lp is None:
-        return None, None, None
-
-    R_initial = compute_R(x_lp) if integer else 1.0
-    R = R_initial if R_initial > 0 else 1.0
-
-    if integer:
-        x = np.zeros(n, dtype=int)
-        best_cost, _ = evaluate_solution(x, c, A, b, integer)
-        if best_cost == float('inf'):
-            x = np.round(x_lp).astype(int)
-            best_cost, _ = evaluate_solution(x, c, A, b, integer)
-    else:
-        x = x_lp.copy()
-        best_cost = c @ x
-
-    cycles_log = []
-    gap_history = []
-    R_history = []
-    no_improve = 0
-    cycles_done = 0
-    stop_reason = ""
-    acceleration_active = False
-
-    cost_repeat_count = 0
-    gap_repeat_count = 0
-    stable_gap_count = 0
-    last_cost = None
-    last_gap = None
-    last_R = None
-    last_x = x.copy()
-
-    progress_bar = st.progress(0)
-    status_placeholder = st.empty()
-    details_placeholder = st.empty()
-    start_time = time.time()
-
-    for cycle in range(max_cycles):
-        current_R = R / (cycle + 1)
-
-        coarse = []
-        if integer and x_lp is not None:
-            open_now = np.where(x > 0.5)[0].tolist()
-            top_lp = np.argsort(-x_lp)[:k_coarse].tolist()
-            coarse = list(set(open_now + top_lp))
-            if len(coarse) > 10:
-                importance = [(i, x_lp[i]) for i in coarse]
-                importance.sort(key=lambda x: x[1], reverse=True)
-                coarse = [i for i, _ in importance[:10]]
-
-        new_cost, new_x = vcycle_general(x, c, A, b, coarse, x_lp, current_R, integer=integer)
-        gap = (new_cost - lp_val) / lp_val * 100 if lp_val != 0 else 0
-        R_val = compute_R(new_x) if integer else 0
-        diff = np.linalg.norm(new_x - last_x)
-
-        improved = new_cost < best_cost - 1e-6
-        if improved:
-            best_cost = new_cost
-            x = new_x
-            no_improve = 0
-        else:
-            no_improve += 1
-
-        gap_history.append(gap)
-        R_history.append(R_val)
-        cycles_log.append({
-            'cycle': cycle+1,
-            'cost': new_cost,
-            'gap': gap,
-            'R': R_val,
-            'diff': diff,
-            'improved': improved,
-            'best_so_far': best_cost
-        })
-
-        progress_bar.progress((cycle + 1) / max_cycles)
-        status_placeholder.info(f"**Cycle {cycle+1} / {max_cycles}**")
-        details_placeholder.markdown(
-            f"**Current cost:** {new_cost:,.2f}  \n"
-            f"**Gap:** {gap:.4f}%  \n"
-            f"**R:** {R_val:.6f}  \n"
-            f"**Improved:** {'✅' if improved else '❌'}  \n"
-            f"**Best so far:** {best_cost:,.2f}"
-        )
-        time.sleep(0.1)
-
-        if integer and not acceleration_active and gap < 2.0 and R_val < 0.01:
-            acceleration_active = True
-            st.info(t('acceleration_on'))
-        elif integer and acceleration_active and (gap >= 2.0 or R_val >= 0.01):
-            acceleration_active = False
-
-        stop_now = False
-
-        if no_improve >= patience:
-            stop_reason = f"Patience ({patience} cycles without improvement)"
-            stop_now = True
-
-        if not stop_now and use_R and current_R < R_tol:
-            if last_gap is not None and abs(gap - last_gap) < 1e-6:
-                stable_gap_count += 1
-                if stable_gap_count >= stable_gap_needed:
-                    stop_reason = f"R < {R_tol} and gap stable for {stable_gap_needed} cycles"
-                    stop_now = True
-            else:
-                stable_gap_count = 0
-
-        if not stop_now and use_cost_repeat and last_cost is not None and abs(new_cost - last_cost) < 1e-6:
-            cost_repeat_count += 1
-            if cost_repeat_count >= cost_repeat_times:
-                stop_reason = f"Cost repeated {cost_repeat_times} times"
-                stop_now = True
-        else:
-            cost_repeat_count = 0
-
-        if not stop_now and use_gap_repeat and last_gap is not None and abs(gap - last_gap) < 1e-6:
-            gap_repeat_count += 1
-            if gap_repeat_count >= gap_repeat_times:
-                stop_reason = f"Gap repeated {gap_repeat_times} times"
-                stop_now = True
-        else:
-            gap_repeat_count = 0
-
-        if not stop_now and use_contraction and diff < diff_tol and current_R < R_tol:
-            stop_reason = f"Contraction: diff < {diff_tol} and R < {R_tol}"
-            stop_now = True
-
-        last_cost = new_cost
-        last_gap = gap
-        last_R = R_val
-        last_x = new_x.copy()
-
-        if stop_now:
-            cycles_done = cycle + 1
-            break
-
-    if cycles_done == 0:
-        cycles_done = max_cycles
-        stop_reason = f"Max cycles ({max_cycles}) reached"
-
-    total_time = time.time() - start_time
-    progress_bar.empty()
-    status_placeholder.empty()
-    details_placeholder.empty()
-
-    if acceleration_active:
-        st.info(t('acceleration_on'))
-
-    return {
-        'best_cost': best_cost,
-        'lp_val': lp_val,
-        'gap': (best_cost - lp_val) / lp_val * 100 if lp_val != 0 else 0,
-        'cycles_done': cycles_done,
-        'gap_history': gap_history,
-        'R_history': R_history,
-        'cycles_log': cycles_log,
-        'stop_reason': stop_reason,
-        'total_time': total_time
-    }, x
-
-# ------------------- دوال قراءة الملفات -------------------
+# ------------------- دوال قراءة ملفات UFLP -------------------
 def read_uflp_file(text):
     lines = text.strip().splitlines()
     clean_lines = []
@@ -1091,50 +719,18 @@ def read_uflp_file(text):
             raise ValueError(f"السطر {data_start+1+i+1} لا يحتوي على العدد المناسب من القيم.")
     return f, c, n, m
 
-def read_general_file(text):
-    lines = text.strip().splitlines()
-    clean_lines = []
-    for line in lines:
-        line = line.strip()
-        if line and not line.startswith('#') and not line.startswith('!') and not line.upper().startswith('FILE:'):
-            clean_lines.append(line)
-    if len(clean_lines) < 3:
-        raise ValueError("الملف لا يحتوي على بيانات كافية.")
-    parts = clean_lines[0].split()
-    n = int(parts[0])
-    m = int(parts[1])
-    c = np.array(list(map(float, clean_lines[1].split())))
-    if len(c) != n:
-        raise ValueError("عدد معاملات الهدف لا يتطابق مع n")
-    A = np.zeros((m, n))
-    for i in range(m):
-        row = list(map(float, clean_lines[2+i].split()))
-        if len(row) != n:
-            raise ValueError(f"عدد عناصر الصف {i} لا يتطابق مع n")
-        A[i] = row
-    b_line = clean_lines[2+m].split()
-    b = np.array(list(map(float, b_line)))
-    if len(b) != m:
-        raise ValueError("عدد عناصر b لا يتطابق مع m")
-    return c, A, b, n, m
-
-def generate_random_instance(n, m):
-    c = np.random.uniform(1, 10, n)
-    A = np.random.uniform(0, 5, (m, n))
-    b = np.random.uniform(5, 20, m)
-    return c, A, b
+def generate_random_uflp(n, m):
+    f = np.random.uniform(1000, 20000, n)
+    c = np.random.uniform(100, 500, (n, m))
+    return f, c
 
 # ------------------- دالة إرسال التعليق إلى GitHub Issues -------------------
 def send_to_github_issue(comment, repo_owner, repo_name, token):
-    """
-    إرسال تعليق كـ Issue جديد إلى مستودع GitHub.
-    """
     url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/issues"
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
-    # عنوان ثابت مع التاريخ
     title = f"تعليق من مستخدم في {datetime.now().strftime('%Y-%m-%d %H:%M')}"
     data = {
         "title": title,
@@ -1150,7 +746,7 @@ def send_to_github_issue(comment, repo_owner, repo_name, token):
         return False, str(e)
 
 # ------------------- واجهة Streamlit -------------------
-st.set_page_config(page_title="AHRH Solver", layout="wide")
+st.set_page_config(page_title="AHRH Solver - UFLP", layout="wide")
 
 col1, col2 = st.columns([4, 1])
 with col2:
@@ -1208,25 +804,29 @@ with st.sidebar:
     st.markdown("---")
     st.write(f"{t('workers')}: {NUM_WORKERS}")
 
-# اختيار نوع المسألة للمدخلات اليدوية والعشوائية
-problem_type = st.radio(t('problem_type'), [t('lp'), t('ilp')])
-is_integer = (problem_type == t('ilp'))
-
 tab1, tab2, tab3 = st.tabs([t('tab_upload'), t('tab_random'), t('tab_manual')])
 
 with tab1:
     st.header(t('upload_header'))
     st.info(t('upload_info'))
     
-    # زر لمساعد التنسيق
-    with st.expander(t('file_format_help')):
-        st.markdown(t('uflp_format'))
-        st.markdown("---")
-        st.markdown(t('general_format'))
-    
-    # اختيار نوع الملف
-    file_type = st.radio(t('file_type'), [t('uflp'), t('general')])
-    is_uflp = (file_type == t('uflp'))
+    # شرح تنسيق الملف (اختياري)
+    with st.expander("📄 مساعدة حول تنسيق الملف"):
+        st.markdown("""
+        **تنسيق ملف UFLP (مثل gs250, capb):**
+        - السطر الأول: `n m 0` حيث n عدد المواقع، m عدد العملاء.
+        - ثم n سطر، كل سطر يمثل موقعاً: `[رقم الموقع] [تكلفة الفتح] [تكلفة النقل إلى العميل 1] [تكلفة النقل إلى العميل 2] ... [تكلفة النقل إلى العميل m]`
+        - مثال:
+        ```
+        5 3 0
+        1 100 5 6 7
+        2 150 8 9 10
+        3 120 4 5 6
+        4 130 7 8 9
+        5 110 3 4 5
+        ```
+        - يتم تجاهل الأسطر التي تبدأ بـ # أو ! أو FILE:.
+        """)
     
     uploaded_file = st.file_uploader(t('choose_file'), type=None)
     if uploaded_file is not None:
@@ -1236,36 +836,20 @@ with tab1:
             except:
                 text = uploaded_file.getvalue().decode("latin-1")
             try:
-                if is_uflp:
-                    f, c_mat, n, m = read_uflp_file(text)
-                    result = solve_ahrh_uflp(
-                        f, c_mat,
-                        max_cycles, k_coarse, patience,
-                        use_R, R_tol, stable_gap_needed,
-                        use_cost_repeat, cost_repeat_times,
-                        use_gap_repeat, gap_repeat_times,
-                        use_contraction, diff_tol
-                    )
-                    st.success(f"File loaded: {n} facilities, {m} customers")
-                    if result:
-                        st.session_state['result'] = result
-                        st.session_state['n'] = n
-                        st.session_state['m'] = m
-                else:
-                    c, A, b, n, m = read_general_file(text)
-                    st.success(f"File loaded: {n} variables, {m} constraints")
-                    result, x = solve_ahrh_general(
-                        c, A, b, integer=is_integer,
-                        max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
-                        use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
-                        use_cost_repeat=use_cost_repeat, cost_repeat_times=cost_repeat_times,
-                        use_gap_repeat=use_gap_repeat, gap_repeat_times=gap_repeat_times,
-                        use_contraction=use_contraction, diff_tol=diff_tol
-                    )
-                    if result:
-                        st.session_state['result'] = result
-                        st.session_state['n'] = n
-                        st.session_state['m'] = m
+                f, c, n, m = read_uflp_file(text)
+                st.success(f"File loaded: {n} facilities, {m} customers")
+                result = solve_ahrh_uflp(
+                    f, c,
+                    max_cycles, k_coarse, patience,
+                    use_R, R_tol, stable_gap_needed,
+                    use_cost_repeat, cost_repeat_times,
+                    use_gap_repeat, gap_repeat_times,
+                    use_contraction, diff_tol
+                )
+                if result:
+                    st.session_state['result'] = result
+                    st.session_state['n'] = n
+                    st.session_state['m'] = m
             except Exception as e:
                 st.error(f"Error reading file: {e}")
 
@@ -1273,19 +857,19 @@ with tab2:
     st.header(t('random_header'))
     col1, col2 = st.columns(2)
     with col1:
-        n_rand = st.number_input(t('random_n'), min_value=5, max_value=50, value=10, step=1, key="n_rand")
+        n_rand = st.number_input(t('random_n'), min_value=5, max_value=200, value=50, step=5, key="n_rand")
     with col2:
-        m_rand = st.number_input(t('random_m'), min_value=5, max_value=50, value=10, step=1, key="m_rand")
+        m_rand = st.number_input(t('random_m'), min_value=5, max_value=200, value=50, step=5, key="m_rand")
     if st.button(t('random_button'), key="gen_rand"):
         with st.spinner("Generating and solving..."):
-            c, A, b = generate_random_instance(int(n_rand), int(m_rand))
-            result, x = solve_ahrh_general(
-                c, A, b, integer=is_integer,
-                max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
-                use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
-                use_cost_repeat=use_cost_repeat, cost_repeat_times=cost_repeat_times,
-                use_gap_repeat=use_gap_repeat, gap_repeat_times=gap_repeat_times,
-                use_contraction=use_contraction, diff_tol=diff_tol
+            f, c = generate_random_uflp(int(n_rand), int(m_rand))
+            result = solve_ahrh_uflp(
+                f, c,
+                max_cycles, k_coarse, patience,
+                use_R, R_tol, stable_gap_needed,
+                use_cost_repeat, cost_repeat_times,
+                use_gap_repeat, gap_repeat_times,
+                use_contraction, diff_tol
             )
             if result:
                 st.session_state['result'] = result
@@ -1302,50 +886,42 @@ with tab3:
     with col2:
         m_man = st.number_input(t('manual_m'), min_value=1, max_value=10, value=3, step=1, key="m_man")
 
-    if 'c_man' not in st.session_state or len(st.session_state.c_man) != n_man:
-        st.session_state.c_man = np.zeros(n_man)
-    if 'A_man' not in st.session_state or st.session_state.A_man.shape != (m_man, n_man):
-        st.session_state.A_man = np.zeros((m_man, n_man))
-    if 'b_man' not in st.session_state or len(st.session_state.b_man) != m_man:
-        st.session_state.b_man = np.zeros(m_man)
+    if 'f_man' not in st.session_state or st.session_state.get('n_man_prev') != n_man:
+        st.session_state['f_man'] = np.zeros(n_man)
+        st.session_state['n_man_prev'] = n_man
+    if 'c_man' not in st.session_state or st.session_state.get('n_man_prev') != n_man or st.session_state.get('m_man_prev') != m_man:
+        st.session_state['c_man'] = np.zeros((n_man, m_man))
+        st.session_state['m_man_prev'] = m_man
 
-    st.subheader(t('manual_c'))
-    c_vals = []
+    st.subheader(t('manual_f'))
+    f_vals = []
     cols = st.columns(min(5, n_man))
     for i in range(n_man):
         with cols[i % 5]:
-            val = st.number_input(f"c[{i}]", value=float(st.session_state.c_man[i]), key=f"c_man_{i}")
-            c_vals.append(val)
-    st.session_state.c_man = np.array(c_vals)
+            val = st.number_input(f"f[{i}]", value=float(st.session_state['f_man'][i]), key=f"f_man_{i}")
+            f_vals.append(val)
+    st.session_state['f_man'] = np.array(f_vals)
 
-    st.subheader(t('manual_A'))
-    for i in range(m_man):
-        st.write(f"**Constraint {i+1}:**")
-        cols = st.columns(min(5, n_man))
-        for j in range(n_man):
+    st.subheader(t('manual_c'))
+    c_vals = np.zeros((n_man, m_man))
+    for i in range(n_man):
+        st.write(f"**{t('manual_c')} {i}:**")
+        cols = st.columns(min(5, m_man))
+        for j in range(m_man):
             with cols[j % 5]:
-                val = st.number_input(f"A[{i}][{j}]", value=float(st.session_state.A_man[i, j]), key=f"A_man_{i}_{j}")
-                st.session_state.A_man[i, j] = val
-
-    st.subheader(t('manual_b'))
-    b_vals = []
-    cols = st.columns(min(5, m_man))
-    for i in range(m_man):
-        with cols[i % 5]:
-            val = st.number_input(f"b[{i}]", value=float(st.session_state.b_man[i]), key=f"b_man_{i}")
-            b_vals.append(val)
-    st.session_state.b_man = np.array(b_vals)
+                val = st.number_input(f"c[{i}][{j}]", value=float(st.session_state['c_man'][i, j]), key=f"c_man_{i}_{j}")
+                c_vals[i, j] = val
+    st.session_state['c_man'] = c_vals
 
     if st.button(t('solve_button'), key="solve_manual"):
         with st.spinner("Running algorithm..."):
-            result, x = solve_ahrh_general(
-                st.session_state.c_man, st.session_state.A_man, st.session_state.b_man,
-                integer=is_integer,
-                max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
-                use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
-                use_cost_repeat=use_cost_repeat, cost_repeat_times=cost_repeat_times,
-                use_gap_repeat=use_gap_repeat, gap_repeat_times=gap_repeat_times,
-                use_contraction=use_contraction, diff_tol=diff_tol
+            result = solve_ahrh_uflp(
+                st.session_state['f_man'], st.session_state['c_man'],
+                max_cycles, k_coarse, patience,
+                use_R, R_tol, stable_gap_needed,
+                use_cost_repeat, cost_repeat_times,
+                use_gap_repeat, gap_repeat_times,
+                use_contraction, diff_tol
             )
             if result:
                 st.session_state['result'] = result
@@ -1358,18 +934,11 @@ st.header(t('results'))
 
 if 'result' in st.session_state:
     res = st.session_state['result']
-    # نتائج UFLP تحتوي على open_fac، نتائج عامة لا تحتوي
-    if 'open_fac' in res:
-        colA, colB, colC, colD = st.columns(4)
-        colA.metric(t('best_cost'), f"{res['best_cost']:,.0f}")
-        colB.metric(t('lp_val'), f"{res['lp_val']:,.0f}")
-        colC.metric(t('gap'), f"{res['gap']:.4f}%")
-        colD.metric(t('open_fac'), res['open_fac'])
-    else:
-        colA, colB, colC = st.columns(3)
-        colA.metric(t('best_cost'), f"{res['best_cost']:,.2f}")
-        colB.metric(t('lp_val'), f"{res['lp_val']:,.2f}")
-        colC.metric(t('gap'), f"{res['gap']:.4f}%")
+    colA, colB, colC, colD = st.columns(4)
+    colA.metric(t('best_cost'), f"{res['best_cost']:,.0f}")
+    colB.metric(t('lp_val'), f"{res['lp_val']:,.0f}")
+    colC.metric(t('gap'), f"{res['gap']:.4f}%")
+    colD.metric(t('open_fac'), res['open_fac'])
 
     colE, colF, colG = st.columns(3)
     colE.metric(t('cycles_done'), res['cycles_done'])
@@ -1453,3 +1022,4 @@ else:
 
 st.markdown("---")
 st.caption(t('footer'))
+```
