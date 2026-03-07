@@ -3,7 +3,11 @@
 تطبيق AHRH الكامل مع معلومات الاتصال باللون الأحمر وبحجم كبير
 وجميع الوظائف السابقة (عرض التقدم، معايير التوقف، اللغات، التوازي)
 """
-def solve_ahrh_with_log(f, c, ...):
+def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
+                        use_R, R_tol, stable_gap_needed,
+                        use_cost_repeat, cost_repeat_times,
+                        use_gap_repeat, gap_repeat_times,
+                        use_contraction, diff_tol):
     # بعد قراءة f, c
     st.write("f[:5]:", f[:5])
     st.write("c[:5, :5]:", c[:5, :5])
