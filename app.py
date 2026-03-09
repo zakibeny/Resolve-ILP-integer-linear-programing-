@@ -1,9 +1,9 @@
-
 # -*- coding: utf-8 -*-
 """
 تطبيق AHRH لحل مسائل البرمجة الصحيحة (ILP) و UFLP
 مع واجهة متعددة اللغات، عرض التقدم، معايير توقف متعددة، وإرسال التعليقات إلى GitHub Issues
 (تم إزالة LP المستمرة فقط، مع الإبقاء على ILP العام و UFLP كحالة خاصة)
+مع إضافة ميزة الإيقاف المؤقت والاستئناف (Pause/Resume) وإزالة التبويب العشوائي.
 """
 
 import streamlit as st
@@ -59,7 +59,6 @@ translations = {
         'diff_tol': 'عتبة الفرق بين الحلول (ε₁)',
         'workers': 'عدد العمال (للتوازي)',
         'tab_upload': '📂 رفع ملف',
-        'tab_random': '🎲 توليد عشوائي',
         'tab_manual': '✍️ إدخال يدوي',
         'upload_header': 'رفع ملف المسألة',
         'upload_info': 'يدعم ملفات UFLP (مثل gs250) والملفات العامة بصيغة ILP.',
@@ -79,10 +78,6 @@ translations = {
 - السطر الأول: `n m 0` (عدد المواقع، عدد العملاء)
 - ثم n سطر: `رقم الموقع` `تكلفة الفتح` `تكاليف النقل إلى m عميل`
 """,
-        'random_header': 'توليد مسألة عشوائية',
-        'random_n': 'عدد المتغيرات (n)',
-        'random_m': 'عدد القيود (m)',
-        'random_button': '🎲 توليد وحل',
         'manual_header': 'إدخال بيانات المسألة يدويًا',
         'manual_warning': 'للمسائل الصغيرة فقط (n ≤ 10, m ≤ 10)',
         'manual_n': 'عدد المتغيرات (n)',
@@ -122,6 +117,9 @@ translations = {
         'feedback_error': '❌ فشل الإرسال:',
         'feedback_missing_token': '⚠️ خدمة إرسال التعليقات غير مفعلة حالياً.',
         'feedback_warning': 'الرجاء كتابة تعليق قبل الإرسال.',
+        'pause_button': '⏸️ تعليق',
+        'resume_button': '▶️ استئناف',
+        'paused_message': '⏸️ الخوارزمية معلقة. اضغط استئناف للمتابعة.',
     },
     'English': {
         'app_title': '🧠 AHRH: Advanced Hierarchical Radial Heuristic',
@@ -153,7 +151,6 @@ translations = {
         'diff_tol': 'Solution difference tolerance (ε₁)',
         'workers': 'Workers (parallel threads)',
         'tab_upload': '📂 Upload File',
-        'tab_random': '🎲 Random Generation',
         'tab_manual': '✍️ Manual Input',
         'upload_header': 'Upload Problem File',
         'upload_info': 'Supports UFLP files (e.g., gs250) and general ILP files.',
@@ -173,10 +170,6 @@ translations = {
 - First line: `n m 0` (number of facilities, number of customers)
 - Then n lines: `facility_index` `opening_cost` `transport_costs to m customers`
 """,
-        'random_header': 'Generate Random Instance',
-        'random_n': 'Number of variables (n)',
-        'random_m': 'Number of constraints (m)',
-        'random_button': '🎲 Generate and Solve',
         'manual_header': 'Manual Data Entry',
         'manual_warning': 'For small problems only (n ≤ 10, m ≤ 10)',
         'manual_n': 'Number of variables (n)',
@@ -216,6 +209,9 @@ translations = {
         'feedback_error': '❌ Sending failed:',
         'feedback_missing_token': '⚠️ Feedback service is currently disabled.',
         'feedback_warning': 'Please write a comment before sending.',
+        'pause_button': '⏸️ Pause',
+        'resume_button': '▶️ Resume',
+        'paused_message': '⏸️ Algorithm paused. Press Resume to continue.',
     },
     'Français': {
         'app_title': '🧠 AHRH: Algorithme Hiérarchique Radial Contractant',
@@ -247,7 +243,6 @@ translations = {
         'diff_tol': 'Tolérance de différence entre solutions (ε₁)',
         'workers': 'Travailleurs (threads parallèles)',
         'tab_upload': '📂 Télécharger un fichier',
-        'tab_random': '🎲 Génération aléatoire',
         'tab_manual': '✍️ Saisie manuelle',
         'upload_header': 'Télécharger le fichier problème',
         'upload_info': 'Accepte les fichiers UFLP (ex. gs250) et les fichiers ILP généraux.',
@@ -267,10 +262,6 @@ translations = {
 - Première ligne : `n m 0` (nombre de sites, nombre de clients)
 - Ensuite n lignes : `indice_site` `coût_ouverture` `coûts_transport vers m clients`
 """,
-        'random_header': 'Générer une instance aléatoire',
-        'random_n': 'Nombre de variables (n)',
-        'random_m': 'Nombre de contraintes (m)',
-        'random_button': '🎲 Générer et résoudre',
         'manual_header': 'Saisie manuelle des données',
         'manual_warning': 'Pour petits problèmes uniquement (n ≤ 10, m ≤ 10)',
         'manual_n': 'Nombre de variables (n)',
@@ -310,6 +301,9 @@ translations = {
         'feedback_error': '❌ Échec de l\'envoi :',
         'feedback_missing_token': '⚠️ Le service de commentaires est actuellement désactivé.',
         'feedback_warning': 'Veuillez écrire un commentaire avant d\'envoyer.',
+        'pause_button': '⏸️ Pause',
+        'resume_button': '▶️ Reprendre',
+        'paused_message': '⏸️ Algorithme en pause. Appuyez sur Reprendre pour continuer.',
     }
 }
 
@@ -318,6 +312,8 @@ def t(key):
 
 if 'language' not in st.session_state:
     st.session_state.language = 'English'
+if 'paused' not in st.session_state:
+    st.session_state.paused = False
 
 # ------------------- دوال أساسية مشتركة -------------------
 def get_fractional_indices(y, eps=0.01):
@@ -377,7 +373,7 @@ def lp_relaxation_uflp(f, c):
     return None, None
 
 def vcycle_uflp(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
-    # دورة V لمسائل UFLP (نفس الكود القديم)
+    # دورة V لمسائل UFLP
     cost1, y1 = smooth_uflp(y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
     if not coarse:
         return cost1, y1
@@ -565,38 +561,89 @@ def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
                     use_R, R_tol, stable_gap_needed,
                     use_cost_repeat, cost_repeat_times,
                     use_gap_repeat, gap_repeat_times,
-                    use_contraction, diff_tol):
+                    use_contraction, diff_tol,
+                    resume_state=None):
     n, m = len(f), c.shape[1]
     y_lp, lp_val = lp_relaxation_uflp(f, c)
-    if lp_val is None:
-        lp_val = float('inf')
+    if lp_val is None or lp_val == 0:
+        lp_val = 1e-12  # تجنب القسمة على صفر
 
-    y = np.ones(n, dtype=int)
-    best = solve_lp_fixed_y_uflp(y, f, c)
+    # استعادة الحالة إذا وجدت
+    if resume_state is not None:
+        y = resume_state['y']
+        best = resume_state['best']
+        cycles_log = resume_state['cycles_log']
+        gap_history = resume_state['gap_history']
+        R_history = resume_state['R_history']
+        diff_history = resume_state['diff_history']
+        no_improve = resume_state['no_improve']
+        cycles_done = resume_state['cycles_done']
+        stop_reason = resume_state['stop_reason']
+        acceleration_active = resume_state['acceleration_active']
+        cost_repeat_count = resume_state['cost_repeat_count']
+        gap_repeat_count = resume_state['gap_repeat_count']
+        stable_gap_count = resume_state['stable_gap_count']
+        last_cost = resume_state['last_cost']
+        last_gap = resume_state['last_gap']
+        last_R = resume_state['last_R']
+        last_y = resume_state['last_y']
+        start_cycle = resume_state['cycle'] + 1   # نبدأ من الدورة التالية
+        total_time_so_far = resume_state['total_time_so_far']
+    else:
+        y = np.ones(n, dtype=int)
+        best = solve_lp_fixed_y_uflp(y, f, c)
+        cycles_log = []
+        gap_history = []
+        R_history = []
+        diff_history = []
+        no_improve = 0
+        cycles_done = 0
+        stop_reason = ""
+        acceleration_active = False
+        cost_repeat_count = 0
+        gap_repeat_count = 0
+        stable_gap_count = 0
+        last_cost = None
+        last_gap = None
+        last_R = None
+        last_y = y.copy()
+        start_cycle = 0
+        total_time_so_far = 0.0
 
-    cycles_log = []
-    gap_history = []
-    R_history = []
-    diff_history = []
-    no_improve = 0
-    cycles_done = 0
-    stop_reason = ""
-    acceleration_active = False
-
-    cost_repeat_count = 0
-    gap_repeat_count = 0
-    stable_gap_count = 0
-    last_cost = None
-    last_gap = None
-    last_R = None
-    last_y = y.copy()
-
-    progress_bar = st.progress(0)
+    progress_bar = st.progress(start_cycle / max_cycles if max_cycles>0 else 0)
     status_placeholder = st.empty()
     details_placeholder = st.empty()
     start_time = time.time()
 
-    for cycle in range(max_cycles):
+    cycle = start_cycle
+    while cycle < max_cycles:
+        if st.session_state.get('paused', False):
+            # حفظ الحالة الحالية
+            st.session_state.resume_state = {
+                'y': y,
+                'best': best,
+                'cycles_log': cycles_log,
+                'gap_history': gap_history,
+                'R_history': R_history,
+                'diff_history': diff_history,
+                'no_improve': no_improve,
+                'cycles_done': cycle,
+                'stop_reason': stop_reason,
+                'acceleration_active': acceleration_active,
+                'cost_repeat_count': cost_repeat_count,
+                'gap_repeat_count': gap_repeat_count,
+                'stable_gap_count': stable_gap_count,
+                'last_cost': last_cost,
+                'last_gap': last_gap,
+                'last_R': last_R,
+                'last_y': last_y,
+                'cycle': cycle,
+                'total_time_so_far': total_time_so_far + (time.time() - start_time)
+            }
+            st.info(t('paused_message'))
+            break
+
+        # ---- بداية محتوى الدورة ----
         if y_lp is not None:
             open_now = np.where(y > 0.5)[0].tolist()
             top_lp = np.argsort(-y_lp)[:k_coarse].tolist()
@@ -614,7 +661,11 @@ def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
             st.session_state.acceleration = False
 
         new_cost, new_y = vcycle_uflp(y, f, c, coarse, y_lp=y_lp, gap_threshold=3.0)
-        gap = (new_cost - lp_val) / lp_val * 100 if lp_val != float('inf') else 0
+        # حساب الفجوة مع تجنب القسمة على صفر
+        if lp_val != 0:
+            gap = (new_cost - lp_val) / lp_val * 100
+        else:
+            gap = 0.0
         R_val = compute_R(new_y)
         diff = np.linalg.norm(new_y - last_y)
 
@@ -704,12 +755,20 @@ def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
         if stop_now:
             cycles_done = cycle + 1
             break
+        # ---- نهاية محتوى الدورة ----
 
-    if cycles_done == 0:
+        cycle += 1
+
+    # بعد الخروج من الحلقة (إما بالانتهاء أو بالتعليق)
+    total_time = total_time_so_far + (time.time() - start_time)
+
+    if cycle >= max_cycles:
         cycles_done = max_cycles
         stop_reason = f"Max cycles ({max_cycles}) reached"
+        if 'resume_state' in st.session_state:
+            del st.session_state.resume_state
+        st.session_state.paused = False
 
-    total_time = time.time() - start_time
     progress_bar.empty()
     status_placeholder.empty()
     details_placeholder.empty()
@@ -720,7 +779,7 @@ def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
     return {
         'best_cost': best,
         'lp_val': lp_val,
-        'gap': (best - lp_val) / lp_val * 100 if lp_val != float('inf') else 0,
+        'gap': (best - lp_val) / lp_val * 100 if lp_val != 0 else 0,
         'open_fac': len(np.where(y > 0.5)[0]),
         'cycles_done': cycles_done,
         'gap_history': gap_history,
@@ -732,9 +791,9 @@ def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
         'total_time': total_time
     }
 
-# ------------------- دوال المسائل العامة (ILP فقط، بدون LP مستمر) -------------------
+# ------------------- دوال المسائل العامة (ILP فقط) -------------------
 def solve_lp_pulp_integer(c, A, b):
-    """حل LP relaxation فقط (للمتغيرات المستمرة) - يستخدم للحصول على x_lp و lp_val"""
+    """حل LP relaxation - يستخدم للحصول على x_lp و lp_val"""
     n = len(c)
     m = len(b)
     prob = pulp.LpProblem("LP_Relax", pulp.LpMinimize)
@@ -809,47 +868,95 @@ def solve_ahrh_general_ilp(c, A, b, max_cycles=20, k_coarse=5, patience=5,
                            use_R=False, R_tol=1e-6, stable_gap_needed=2,
                            use_cost_repeat=False, cost_repeat_times=2,
                            use_gap_repeat=False, gap_repeat_times=2,
-                           use_contraction=False, diff_tol=1e-12):
+                           use_contraction=False, diff_tol=1e-12,
+                           resume_state=None):
     n = len(c)
     m = len(b)
 
     x_lp, lp_val = solve_lp_pulp_integer(c, A, b)
     if x_lp is None:
         return None, None, None
+    if lp_val == 0:
+        lp_val = 1e-12  # تجنب القسمة على صفر
 
     R_initial = compute_R(x_lp)
     R = R_initial if R_initial > 0 else 1.0
 
-    # حل ابتدائي (تقريب حل LP)
-    x = np.round(x_lp).astype(int)
-    x = np.maximum(x, 0)
-    best_cost, _ = evaluate_integer_solution(x, c, A, b)
-    if best_cost == float('inf'):
-        x = np.zeros(n, dtype=int)
+    if resume_state is not None:
+        x = resume_state['x']
+        best_cost = resume_state['best_cost']
+        cycles_log = resume_state['cycles_log']
+        gap_history = resume_state['gap_history']
+        R_history = resume_state['R_history']
+        no_improve = resume_state['no_improve']
+        cycles_done = resume_state['cycles_done']
+        stop_reason = resume_state['stop_reason']
+        acceleration_active = resume_state['acceleration_active']
+        cost_repeat_count = resume_state['cost_repeat_count']
+        gap_repeat_count = resume_state['gap_repeat_count']
+        stable_gap_count = resume_state['stable_gap_count']
+        last_cost = resume_state['last_cost']
+        last_gap = resume_state['last_gap']
+        last_R = resume_state['last_R']
+        last_x = resume_state['last_x']
+        start_cycle = resume_state['cycle'] + 1
+        total_time_so_far = resume_state['total_time_so_far']
+    else:
+        # حل ابتدائي (تقريب حل LP)
+        x = np.round(x_lp).astype(int)
+        x = np.maximum(x, 0)
         best_cost, _ = evaluate_integer_solution(x, c, A, b)
+        if best_cost == float('inf'):
+            x = np.zeros(n, dtype=int)
+            best_cost, _ = evaluate_integer_solution(x, c, A, b)
+        cycles_log = []
+        gap_history = []
+        R_history = []
+        no_improve = 0
+        cycles_done = 0
+        stop_reason = ""
+        acceleration_active = False
+        cost_repeat_count = 0
+        gap_repeat_count = 0
+        stable_gap_count = 0
+        last_cost = None
+        last_gap = None
+        last_R = None
+        last_x = x.copy()
+        start_cycle = 0
+        total_time_so_far = 0.0
 
-    cycles_log = []
-    gap_history = []
-    R_history = []
-    no_improve = 0
-    cycles_done = 0
-    stop_reason = ""
-    acceleration_active = False
-
-    cost_repeat_count = 0
-    gap_repeat_count = 0
-    stable_gap_count = 0
-    last_cost = None
-    last_gap = None
-    last_R = None
-    last_x = x.copy()
-
-    progress_bar = st.progress(0)
+    progress_bar = st.progress(start_cycle / max_cycles if max_cycles>0 else 0)
     status_placeholder = st.empty()
     details_placeholder = st.empty()
     start_time = time.time()
 
-    for cycle in range(max_cycles):
+    cycle = start_cycle
+    while cycle < max_cycles:
+        if st.session_state.get('paused', False):
+            st.session_state.resume_state = {
+                'x': x,
+                'best_cost': best_cost,
+                'cycles_log': cycles_log,
+                'gap_history': gap_history,
+                'R_history': R_history,
+                'no_improve': no_improve,
+                'cycles_done': cycle,
+                'stop_reason': stop_reason,
+                'acceleration_active': acceleration_active,
+                'cost_repeat_count': cost_repeat_count,
+                'gap_repeat_count': gap_repeat_count,
+                'stable_gap_count': stable_gap_count,
+                'last_cost': last_cost,
+                'last_gap': last_gap,
+                'last_R': last_R,
+                'last_x': last_x,
+                'cycle': cycle,
+                'total_time_so_far': total_time_so_far + (time.time() - start_time)
+            }
+            st.info(t('paused_message'))
+            break
+
         current_R = R / (cycle + 1)
 
         # اختيار مجموعة خشنة
@@ -864,7 +971,10 @@ def solve_ahrh_general_ilp(c, A, b, max_cycles=20, k_coarse=5, patience=5,
                 coarse = [i for i, _ in importance[:10]]
 
         new_cost, new_x = vcycle_general_ilp(x, c, A, b, coarse, x_lp, current_R)
-        gap = (new_cost - lp_val) / lp_val * 100 if lp_val != 0 else 0
+        if lp_val != 0:
+            gap = (new_cost - lp_val) / lp_val * 100
+        else:
+            gap = 0.0
         R_val = compute_R(new_x)
         diff = np.linalg.norm(new_x - last_x)
 
@@ -949,11 +1059,17 @@ def solve_ahrh_general_ilp(c, A, b, max_cycles=20, k_coarse=5, patience=5,
             cycles_done = cycle + 1
             break
 
-    if cycles_done == 0:
+        cycle += 1
+
+    total_time = total_time_so_far + (time.time() - start_time)
+
+    if cycle >= max_cycles:
         cycles_done = max_cycles
         stop_reason = f"Max cycles ({max_cycles}) reached"
+        if 'resume_state' in st.session_state:
+            del st.session_state.resume_state
+        st.session_state.paused = False
 
-    total_time = time.time() - start_time
     progress_bar.empty()
     status_placeholder.empty()
     details_placeholder.empty()
@@ -1046,17 +1162,6 @@ def read_ilp_file(text):
         raise ValueError("عدد عناصر b لا يتطابق مع m")
     return c, A, b, n, m
 
-def generate_random_ilp(n, m):
-    c = np.random.uniform(1, 10, n)
-    A = np.random.uniform(0, 5, (m, n))
-    b = np.random.uniform(5, 20, m)
-    return c, A, b
-
-def generate_random_uflp(n, m):
-    f = np.random.uniform(1000, 20000, n)
-    c = np.random.uniform(100, 500, (n, m))
-    return f, c
-
 # ------------------- دالة إرسال التعليق إلى GitHub Issues -------------------
 def send_to_github_issue(comment, repo_owner, repo_name, token):
     url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/issues"
@@ -1102,7 +1207,8 @@ st.markdown(f"- {t('feature1')}\n- {t('feature2')}\n- {t('feature3')}\n- {t('fea
 
 with st.sidebar:
     st.header(t('sidebar_algo'))
-    max_cycles = st.slider(t('max_cycles'), 5, 50, 100, 150)
+    # تم تغيير الحد الأقصى إلى 150
+    max_cycles = st.slider(t('max_cycles'), 5, 150, 15, 5)
     k_coarse = st.slider(t('k_coarse'), 3, 10, 5)
     patience = st.slider(t('patience'), 2, 10, 3)
 
@@ -1137,23 +1243,62 @@ with st.sidebar:
     st.markdown("---")
     st.write(f"{t('workers')}: {NUM_WORKERS}")
 
+    # أزرار التحكم في التشغيل
+    st.markdown("---")
+    st.subheader("⏯️ " + t('pause_button') if 'pause_button' in t else "Pause/Resume")
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        if st.button(t('pause_button')):
+            st.session_state.paused = True
+    with col_p2:
+        if st.button(t('resume_button')):
+            st.session_state.paused = False
+            # إذا كانت هناك حالة محفوظة، نعيد تشغيل الدالة معها
+            if 'resume_state' in st.session_state and 'last_params' in st.session_state:
+                params = st.session_state.last_params
+                with st.spinner("استئناف التشغيل..."):
+                    if params['type'] == 'uflp':
+                        result = solve_ahrh_uflp(
+                            params['f'], params['c'],
+                            params['max_cycles'], params['k_coarse'], params['patience'],
+                            params['use_R'], params['R_tol'], params['stable_gap_needed'],
+                            params['use_cost_repeat'], params['cost_repeat_times'],
+                            params['use_gap_repeat'], params['gap_repeat_times'],
+                            params['use_contraction'], params['diff_tol'],
+                            resume_state=st.session_state.resume_state
+                        )
+                        st.session_state.result = result
+                    else:
+                        result, x = solve_ahrh_general_ilp(
+                            params['c'], params['A'], params['b'],
+                            max_cycles=params['max_cycles'], k_coarse=params['k_coarse'], patience=params['patience'],
+                            use_R=params['use_R'], R_tol=params['R_tol'], stable_gap_needed=params['stable_gap_needed'],
+                            use_cost_repeat=params['use_cost_repeat'], cost_repeat_times=params['cost_repeat_times'],
+                            use_gap_repeat=params['use_gap_repeat'], gap_repeat_times=params['gap_repeat_times'],
+                            use_contraction=params['use_contraction'], diff_tol=params['diff_tol'],
+                            resume_state=st.session_state.resume_state
+                        )
+                        st.session_state.result = result
+                        st.session_state.x = x
+                    st.rerun()
+
 # اختيار نوع المسألة (ILP أو UFLP)
 problem_type = st.radio(t('problem_type'), [t('ilp'), t('uflp')])
 is_uflp = (problem_type == t('uflp'))
 
-tab1, tab2, tab3 = st.tabs([t('tab_upload'), t('tab_random'), t('tab_manual')])
+# تبويبان فقط: رفع ملف و إدخال يدوي
+tab1, tab2 = st.tabs([t('tab_upload'), t('tab_manual')])
 
 with tab1:
     st.header(t('upload_header'))
     st.info(t('upload_info'))
-    
-    # شرح التنسيق حسب نوع المسألة
+
     with st.expander("📄 مساعدة حول تنسيق الملف"):
         if is_uflp:
             st.markdown(t('uflp_format_help'))
         else:
             st.markdown(t('ilp_format_help'))
-    
+
     uploaded_file = st.file_uploader(t('choose_file'), type=None)
     if uploaded_file is not None:
         with st.spinner("Reading file and running algorithm..."):
@@ -1165,6 +1310,24 @@ with tab1:
                 if is_uflp:
                     f, c, n, m = read_uflp_file(text)
                     st.success(f"File loaded: {n} facilities, {m} customers")
+                    # تخزين المعاملات للاستئناف
+                    st.session_state.last_params = {
+                        'type': 'uflp',
+                        'f': f,
+                        'c': c,
+                        'max_cycles': max_cycles,
+                        'k_coarse': k_coarse,
+                        'patience': patience,
+                        'use_R': use_R,
+                        'R_tol': R_tol,
+                        'stable_gap_needed': stable_gap_needed,
+                        'use_cost_repeat': use_cost_repeat,
+                        'cost_repeat_times': cost_repeat_times,
+                        'use_gap_repeat': use_gap_repeat,
+                        'gap_repeat_times': gap_repeat_times,
+                        'use_contraction': use_contraction,
+                        'diff_tol': diff_tol,
+                    }
                     result = solve_ahrh_uflp(
                         f, c,
                         max_cycles, k_coarse, patience,
@@ -1180,6 +1343,24 @@ with tab1:
                 else:
                     c, A, b, n, m = read_ilp_file(text)
                     st.success(f"File loaded: {n} variables, {m} constraints")
+                    st.session_state.last_params = {
+                        'type': 'ilp',
+                        'c': c,
+                        'A': A,
+                        'b': b,
+                        'max_cycles': max_cycles,
+                        'k_coarse': k_coarse,
+                        'patience': patience,
+                        'use_R': use_R,
+                        'R_tol': R_tol,
+                        'stable_gap_needed': stable_gap_needed,
+                        'use_cost_repeat': use_cost_repeat,
+                        'cost_repeat_times': cost_repeat_times,
+                        'use_gap_repeat': use_gap_repeat,
+                        'gap_repeat_times': gap_repeat_times,
+                        'use_contraction': use_contraction,
+                        'diff_tol': diff_tol,
+                    }
                     result, x = solve_ahrh_general_ilp(
                         c, A, b,
                         max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
@@ -1196,45 +1377,6 @@ with tab1:
                 st.error(f"Error reading file: {e}")
 
 with tab2:
-    st.header(t('random_header'))
-    col1, col2 = st.columns(2)
-    with col1:
-        n_rand = st.number_input(t('random_n'), min_value=5, max_value=150, value=10, step=1, key="n_rand")
-    with col2:
-        m_rand = st.number_input(t('random_m'), min_value=5, max_value=150, value=10, step=1, key="m_rand")
-    if st.button(t('random_button'), key="gen_rand"):
-        with st.spinner("Generating and solving..."):
-            if is_uflp:
-                f, c = generate_random_uflp(int(n_rand), int(m_rand))
-                result = solve_ahrh_uflp(
-                    f, c,
-                    max_cycles, k_coarse, patience,
-                    use_R, R_tol, stable_gap_needed,
-                    use_cost_repeat, cost_repeat_times,
-                    use_gap_repeat, gap_repeat_times,
-                    use_contraction, diff_tol
-                )
-                if result:
-                    st.session_state['result'] = result
-                    st.session_state['n'] = n_rand
-                    st.session_state['m'] = m_rand
-            else:
-                c, A, b = generate_random_ilp(int(n_rand), int(m_rand))
-                result, x = solve_ahrh_general_ilp(
-                    c, A, b,
-                    max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
-                    use_R=use_R, R_tol=R_tol, stable_gap_needed=stable_gap_needed,
-                    use_cost_repeat=use_cost_repeat, cost_repeat_times=cost_repeat_times,
-                    use_gap_repeat=use_gap_repeat, gap_repeat_times=gap_repeat_times,
-                    use_contraction=use_contraction, diff_tol=diff_tol
-                )
-                if result:
-                    st.session_state['result'] = result
-                    st.session_state['n'] = n_rand
-                    st.session_state['m'] = m_rand
-            st.success("Done!")
-
-with tab3:
     st.header(t('manual_header'))
     st.warning(t('manual_warning'))
     col1, col2 = st.columns(2)
@@ -1274,6 +1416,24 @@ with tab3:
 
         if st.button(t('solve_button'), key="solve_manual"):
             with st.spinner("Running algorithm..."):
+                # تخزين المعاملات للاستئناف
+                st.session_state.last_params = {
+                    'type': 'uflp',
+                    'f': st.session_state['f_man'],
+                    'c': st.session_state['c_man'],
+                    'max_cycles': max_cycles,
+                    'k_coarse': k_coarse,
+                    'patience': patience,
+                    'use_R': use_R,
+                    'R_tol': R_tol,
+                    'stable_gap_needed': stable_gap_needed,
+                    'use_cost_repeat': use_cost_repeat,
+                    'cost_repeat_times': cost_repeat_times,
+                    'use_gap_repeat': use_gap_repeat,
+                    'gap_repeat_times': gap_repeat_times,
+                    'use_contraction': use_contraction,
+                    'diff_tol': diff_tol,
+                }
                 result = solve_ahrh_uflp(
                     st.session_state['f_man'], st.session_state['c_man'],
                     max_cycles, k_coarse, patience,
@@ -1287,7 +1447,6 @@ with tab3:
                     st.session_state['n'] = n_man
                     st.session_state['m'] = m_man
                     st.success("Done!")
-
     else:
         # إدخال ILP عام
         if 'c_man' not in st.session_state or len(st.session_state.c_man) != n_man:
@@ -1326,6 +1485,24 @@ with tab3:
 
         if st.button(t('solve_button'), key="solve_manual"):
             with st.spinner("Running algorithm..."):
+                st.session_state.last_params = {
+                    'type': 'ilp',
+                    'c': st.session_state.c_man,
+                    'A': st.session_state.A_man,
+                    'b': st.session_state.b_man,
+                    'max_cycles': max_cycles,
+                    'k_coarse': k_coarse,
+                    'patience': patience,
+                    'use_R': use_R,
+                    'R_tol': R_tol,
+                    'stable_gap_needed': stable_gap_needed,
+                    'use_cost_repeat': use_cost_repeat,
+                    'cost_repeat_times': cost_repeat_times,
+                    'use_gap_repeat': use_gap_repeat,
+                    'gap_repeat_times': gap_repeat_times,
+                    'use_contraction': use_contraction,
+                    'diff_tol': diff_tol,
+                }
                 result, x = solve_ahrh_general_ilp(
                     st.session_state.c_man, st.session_state.A_man, st.session_state.b_man,
                     max_cycles=max_cycles, k_coarse=k_coarse, patience=patience,
@@ -1340,6 +1517,7 @@ with tab3:
                     st.session_state['m'] = m_man
                     st.success("Done!")
 
+# عرض النتائج
 st.markdown("---")
 st.header(t('results'))
 
@@ -1415,7 +1593,6 @@ else:
 st.markdown("---")
 st.header(t('feedback_section'))
 
-# قراءة معلومات المستودع من secrets
 REPO_OWNER = st.secrets.get("REPO_OWNER", "zakibeny")
 REPO_NAME = st.secrets.get("REPO_NAME", "resolve-ilp-integer-linear-programing-")
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
@@ -1439,6 +1616,3 @@ else:
 
 st.markdown("---")
 st.caption(t('footer'))
-
-
-
