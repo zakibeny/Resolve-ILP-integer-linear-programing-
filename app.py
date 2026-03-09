@@ -1,9 +1,3 @@
-```python
-# -*- coding: utf-8 -*-
-"""
-with speed improvements, pruning, MPS support, clear timer, and pause/resume capability
-"""
-
 import streamlit as st
 import numpy as np
 import pulp
