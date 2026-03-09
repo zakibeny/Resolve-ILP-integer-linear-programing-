@@ -1,9 +1,7 @@
 ```python
 # -*- coding: utf-8 -*-
 """
-تطبيق AHRH المتكامل لحل مسائل UFLP و ILP
-مع تحسينات السرعة التقليم دعم MP مؤقت واضح، وإمكانية الإيقاف المؤقت والاستئناف
-نسخة نهائية مع وصف متعدد اللغات وخيار حفظ على Google Drive (يدوي)
+with speed improvements, pruning, MPS support, clear timer, and pause/resume capability
 """
 
 import streamlit as st
