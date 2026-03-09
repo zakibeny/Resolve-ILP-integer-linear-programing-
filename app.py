@@ -1,4 +1,3 @@
-```python
 # -*- coding: utf-8 -*-
 """
 تطبيق AHRH لحل مسائل البرمجة الصحيحة (ILP) و UFLP
@@ -1156,4 +1155,3 @@ else:
 
 st.markdown("---")
 st.caption(t('footer'))
-```
