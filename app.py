@@ -1199,9 +1199,9 @@ with tab2:
     st.header(t('random_header'))
     col1, col2 = st.columns(2)
     with col1:
-        n_rand = st.number_input(t('random_n'), min_value=5, max_value=50, value=10, step=1, key="n_rand")
+        n_rand = st.number_input(t('random_n'), min_value=5, max_value=150, value=10, step=1, key="n_rand")
     with col2:
-        m_rand = st.number_input(t('random_m'), min_value=5, max_value=50, value=10, step=1, key="m_rand")
+        m_rand = st.number_input(t('random_m'), min_value=5, max_value=150, value=10, step=1, key="m_rand")
     if st.button(t('random_button'), key="gen_rand"):
         with st.spinner("Generating and solving..."):
             if is_uflp:
