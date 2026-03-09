@@ -1106,4 +1106,3 @@ else:
 
 st.markdown("---")
 st.caption(t('footer'))
-```
