@@ -985,13 +985,14 @@ if 'result' in st.session_state:
 
     colE, colF, colG = st.columns(3)
     colE.metric(t('cycles_done'), res['cycles_done'])
-    colF.metric(t('time'), f"{res['total_time']:.2f}")
+    colF.metric(t('time'), f"{res['total_time']:.2f}")  # ✅ الوقت يظهر هنا
     colG.metric(t('size'), f"{st.session_state['n']}×{st.session_state['m']}")
 
     st.info(f"**{t('stop_reason')}:** {res['stop_reason']}")
     if res.get('acceleration_active'):
         st.success(t('acceleration_on'))
 
+    # ✅ رسم بياني للفجوة و R
     if res['gap_history']:
         st.subheader(t('gap_plot'))
         fig, ax1 = plt.subplots(figsize=(10, 5))
