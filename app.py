@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-تطبيق AHRH لحل مسائل البرمجة الصحيحة (ILP) و UFLP
-مع واجهة متعددة اللغات، عرض التقدم، معايير توقف متعددة، وإرسال التعليقات إلى GitHub Issues
-(تم إزالة التبويب العشوائي، مع بقاء كل التحسينات الأخرى)
+تطبيق AHRH المتكامل مع واجهة متعددة اللغات (عربي/إنجليزي/فرنسي)
+وتقنية التسريع التلقائي عند الاقتراب من فجوة 2% - نسخة سريعة ومحسنة
+مع إضافة أزرار الإيقاف المؤقت والاستئناف وحذف التبويب العشوائي
 """
 
 import streamlit as st
@@ -11,22 +11,14 @@ import pulp
 import time
 import matplotlib.pyplot as plt
 import pandas as pd
-import requests
-import json
-from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import warnings
 warnings.filterwarnings("ignore")
 
-# ------------------- معلومات الاتصال -------------------
-CONTACT_EMAIL = "zakibeny@gmail.com"
-CONTACT_PHONE = "0021355614305 / 00213779679073"
-CONTACT_FAX = "036495241"
-
 # ------------------- إعدادات التوازي -------------------
 NUM_WORKERS = 4
 
-# ------------------- ترجمة النصوص (عربي/إنجليزي/فرنسي) -------------------
+# ------------------- ترجمة النصوص -------------------
 translations = {
     'العربية': {
         'app_title': '🧠 AHRH: خوارزمية هرمية انكماشية متطورة',
@@ -39,7 +31,6 @@ translations = {
         'feature6': 'معايير توقف متعددة قابلة للاختيار',
         'feature7': 'وضع التسريع التلقائي عندما تقترب الفجوة من 2%',
         'problem_type': 'نوع المسألة',
-        'ilp': 'برمجة خطية صحيحة عامة (ILP)',
         'uflp': 'مسألة مواقع المرافق (UFLP)',
         'sidebar_algo': '⚙️ معاملات الخوارزمية',
         'max_cycles': 'عدد الدورات الأقصى',
@@ -60,30 +51,14 @@ translations = {
         'tab_upload': '📂 رفع ملف',
         'tab_manual': '✍️ إدخال يدوي',
         'upload_header': 'رفع ملف المسألة',
-        'upload_info': 'يدعم ملفات UFLP (مثل gs250) والملفات العامة بصيغة ILP.',
+        'upload_info': 'يدعم أي ملف نصي (txt, dat, bub, opt, ...). يتم تجاهل الأسطر التي تبدأ بـ # أو ! أو FILE:',
         'choose_file': 'اختر ملف المسألة',
-        'file_type': 'نوع الملف',
-        'uflp_file': 'ملف UFLP (n m 0 + بيانات)',
-        'ilp_file': 'ملف ILP عام (n m + c + A + b)',
-        'ilp_format_help': """
-**تنسيق ملف ILP العام:**
-- السطر الأول: `n m` (عدد المتغيرات، عدد القيود)
-- السطر الثاني: معاملات الهدف c (n قيمة)
-- ثم m سطر: مصفوفة القيود A (كل سطر n قيمة)
-- السطر الأخير: الطرف الأيمن b (m قيمة)
-""",
-        'uflp_format_help': """
-**تنسيق ملف UFLP:**
-- السطر الأول: `n m 0` (عدد المواقع، عدد العملاء)
-- ثم n سطر: `رقم الموقع` `تكلفة الفتح` `تكاليف النقل إلى m عميل`
-""",
         'manual_header': 'إدخال بيانات المسألة يدويًا',
         'manual_warning': 'للمسائل الصغيرة فقط (n ≤ 10, m ≤ 10)',
-        'manual_n': 'عدد المتغيرات (n)',
-        'manual_m': 'عدد القيود (m)',
-        'manual_c': 'معاملات الهدف c[i]',
-        'manual_A': 'مصفوفة القيود A[i][j]',
-        'manual_b': 'الطرف الأيمن b[i]',
+        'manual_n': 'عدد المواقع (n)',
+        'manual_m': 'عدد العملاء (m)',
+        'manual_f': 'تكاليف فتح المرافق f[i]',
+        'manual_c': 'تكاليف النقل c[i][j]',
         'solve_button': '🚀 حل المسألة المدخلة',
         'results': '📊 النتائج',
         'best_cost': 'أفضل تكلفة',
@@ -107,18 +82,14 @@ translations = {
         'download': '📥 تحميل التطور (CSV)',
         'info_placeholder': '👈 اختر مصدر المسألة من التبويبات أعلاه واضغط على زر التشغيل.',
         'footer': 'تم التطوير بواسطة Zakarya Benregreg - خوارزمية AHRH محمية ببراءة اختراع.',
+        'optimal_achieved': '✅ الخوارزمية وصلت للحل الأمثل بالكامل!',
+        'optimal_diff': '⚠️ الفرق عن الحل الأمثل',
         'acceleration_on': '⚡ وضع التسريع مُفعّل (فجوة < 2% و R < 0.01)',
         'acceleration_off': 'وضع التسريع غير مُفعّل',
-        'feedback_section': '💬 تواصل معنا - أرسل تعليقك',
-        'feedback_placeholder': 'اكتب تعليقك هنا... (سيتم إرساله كـ Issue في GitHub)',
-        'feedback_submit': 'إرسال التعليق',
-        'feedback_success': '✅ تم الإرسال بنجاح! يمكنك متابعة الـ issue على الرابط:',
-        'feedback_error': '❌ فشل الإرسال:',
-        'feedback_missing_token': '⚠️ خدمة إرسال التعليقات غير مفعلة حالياً.',
-        'feedback_warning': 'الرجاء كتابة تعليق قبل الإرسال.',
-        'pause_button': '⏸️ تعليق',
+        'pause_button': '⏸️ إيقاف مؤقت',
         'resume_button': '▶️ استئناف',
-        'paused_message': '⏸️ الخوارزمية معلقة. اضغط استئناف للمتابعة.',
+        'paused_message': '⏸️ الخوارزمية في وضع الإيقاف المؤقت. اضغط استئناف للمتابعة.',
+        'control_panel': '⏯️ لوحة التحكم',
     },
     'English': {
         'app_title': '🧠 AHRH: Advanced Hierarchical Radial Heuristic',
@@ -131,7 +102,6 @@ translations = {
         'feature6': 'Multiple customizable stopping criteria',
         'feature7': 'Automatic acceleration mode when gap approaches 2%',
         'problem_type': 'Problem Type',
-        'ilp': 'General Integer Programming (ILP)',
         'uflp': 'Facility Location (UFLP)',
         'sidebar_algo': '⚙️ Algorithm Parameters',
         'max_cycles': 'Max Cycles',
@@ -152,30 +122,14 @@ translations = {
         'tab_upload': '📂 Upload File',
         'tab_manual': '✍️ Manual Input',
         'upload_header': 'Upload Problem File',
-        'upload_info': 'Supports UFLP files (e.g., gs250) and general ILP files.',
+        'upload_info': 'Accepts any text file (txt, dat, bub, opt, ...). Lines starting with #, !, or FILE: are ignored.',
         'choose_file': 'Choose a file',
-        'file_type': 'File Type',
-        'uflp_file': 'UFLP file (n m 0 + data)',
-        'ilp_file': 'General ILP file (n m + c + A + b)',
-        'ilp_format_help': """
-**General ILP File Format:**
-- First line: `n m` (number of variables, number of constraints)
-- Second line: objective coefficients c (n values)
-- Then m lines: constraint matrix A (n values per line)
-- Last line: right-hand side b (m values)
-""",
-        'uflp_format_help': """
-**UFLP File Format:**
-- First line: `n m 0` (number of facilities, number of customers)
-- Then n lines: `facility_index` `opening_cost` `transport_costs to m customers`
-""",
         'manual_header': 'Manual Data Entry',
         'manual_warning': 'For small problems only (n ≤ 10, m ≤ 10)',
-        'manual_n': 'Number of variables (n)',
-        'manual_m': 'Number of constraints (m)',
-        'manual_c': 'Objective coefficients c[i]',
-        'manual_A': 'Constraint matrix A[i][j]',
-        'manual_b': 'Right-hand side b[i]',
+        'manual_n': 'Number of facilities (n)',
+        'manual_m': 'Number of customers (m)',
+        'manual_f': 'Facility opening costs f[i]',
+        'manual_c': 'Transportation costs c[i][j]',
         'solve_button': '🚀 Solve Entered Problem',
         'results': '📊 Results',
         'best_cost': 'Best Cost',
@@ -199,18 +153,14 @@ translations = {
         'download': '📥 Download Evolution (CSV)',
         'info_placeholder': '👈 Choose a data source and click the run button.',
         'footer': 'Developed by Zakarya Benregreg - AHRH algorithm patented.',
+        'optimal_achieved': '✅ Algorithm reached the optimal solution!',
+        'optimal_diff': '⚠️ Difference from optimal',
         'acceleration_on': '⚡ Acceleration mode ON (gap < 2% and R < 0.01)',
         'acceleration_off': 'Acceleration mode OFF',
-        'feedback_section': '💬 Contact Us - Send your feedback',
-        'feedback_placeholder': 'Write your comment here... (will be sent as a GitHub Issue)',
-        'feedback_submit': 'Send Feedback',
-        'feedback_success': '✅ Sent successfully! You can track the issue at:',
-        'feedback_error': '❌ Sending failed:',
-        'feedback_missing_token': '⚠️ Feedback service is currently disabled.',
-        'feedback_warning': 'Please write a comment before sending.',
         'pause_button': '⏸️ Pause',
         'resume_button': '▶️ Resume',
         'paused_message': '⏸️ Algorithm paused. Press Resume to continue.',
+        'control_panel': '⏯️ Control Panel',
     },
     'Français': {
         'app_title': '🧠 AHRH: Algorithme Hiérarchique Radial Contractant',
@@ -223,7 +173,6 @@ translations = {
         'feature6': 'Critères d\'arrêt multiples personnalisables',
         'feature7': 'Mode accélération automatique lorsque le gap approche 2%',
         'problem_type': 'Type de problème',
-        'ilp': 'Programmation en nombres entiers générale (ILP)',
         'uflp': 'Localisation d\'installations (UFLP)',
         'sidebar_algo': '⚙️ Paramètres de l\'algorithme',
         'max_cycles': 'Cycles max',
@@ -244,30 +193,14 @@ translations = {
         'tab_upload': '📂 Télécharger un fichier',
         'tab_manual': '✍️ Saisie manuelle',
         'upload_header': 'Télécharger le fichier problème',
-        'upload_info': 'Accepte les fichiers UFLP (ex. gs250) et les fichiers ILP généraux.',
+        'upload_info': 'Accepte tout fichier texte (txt, dat, bub, opt, ...). Les lignes commençant par #, ! ou FILE: sont ignorées.',
         'choose_file': 'Choisir un fichier',
-        'file_type': 'Type de fichier',
-        'uflp_file': 'Fichier UFLP (n m 0 + données)',
-        'ilp_file': 'Fichier ILP général (n m + c + A + b)',
-        'ilp_format_help': """
-**Format du fichier ILP général :**
-- Première ligne : `n m` (nombre de variables, nombre de contraintes)
-- Deuxième ligne : coefficients objectifs c (n valeurs)
-- Ensuite m lignes : matrice des contraintes A (n valeurs par ligne)
-- Dernière ligne : second membre b (m valeurs)
-""",
-        'uflp_format_help': """
-**Format du fichier UFLP :**
-- Première ligne : `n m 0` (nombre de sites, nombre de clients)
-- Ensuite n lignes : `indice_site` `coût_ouverture` `coûts_transport vers m clients`
-""",
         'manual_header': 'Saisie manuelle des données',
         'manual_warning': 'Pour petits problèmes uniquement (n ≤ 10, m ≤ 10)',
-        'manual_n': 'Nombre de variables (n)',
-        'manual_m': 'Nombre de contraintes (m)',
-        'manual_c': 'Coefficients objectifs c[i]',
-        'manual_A': 'Matrice des contraintes A[i][j]',
-        'manual_b': 'Second membre b[i]',
+        'manual_n': 'Nombre de sites (n)',
+        'manual_m': 'Nombre de clients (m)',
+        'manual_f': 'Coûts d\'ouverture f[i]',
+        'manual_c': 'Coûts de transport c[i][j]',
         'solve_button': '🚀 Résoudre le problème saisi',
         'results': '📊 Résultats',
         'best_cost': 'Meilleur coût',
@@ -291,18 +224,14 @@ translations = {
         'download': '📥 Télécharger l\'évolution (CSV)',
         'info_placeholder': '👈 Choisissez une source de données et cliquez sur le bouton.',
         'footer': 'Développé par Zakarya Benregreg - Algorithme AHRH breveté.',
+        'optimal_achieved': '✅ L\'algorithme a atteint la solution optimale !',
+        'optimal_diff': '⚠️ Différence par rapport à l\'optimal',
         'acceleration_on': '⚡ Mode accélération ACTIVÉ (gap < 2% et R < 0.01)',
         'acceleration_off': 'Mode accélération DÉSACTIVÉ',
-        'feedback_section': '💬 Contactez-nous - Envoyez votre commentaire',
-        'feedback_placeholder': 'Écrivez votre commentaire ici... (sera envoyé comme Issue GitHub)',
-        'feedback_submit': 'Envoyer',
-        'feedback_success': '✅ Envoyé avec succès ! Suivez l\'issue sur :',
-        'feedback_error': '❌ Échec de l\'envoi :',
-        'feedback_missing_token': '⚠️ Le service de commentaires est actuellement désactivé.',
-        'feedback_warning': 'Veuillez écrire un commentaire avant d\'envoyer.',
         'pause_button': '⏸️ Pause',
         'resume_button': '▶️ Reprendre',
         'paused_message': '⏸️ Algorithme en pause. Appuyez sur Reprendre pour continuer.',
+        'control_panel': '⏯️ Panneau de contrôle',
     }
 }
 
@@ -313,36 +242,12 @@ if 'language' not in st.session_state:
     st.session_state.language = 'English'
 if 'paused' not in st.session_state:
     st.session_state.paused = False
+if 'resume_state' not in st.session_state:
+    st.session_state.resume_state = None
+if 'last_params' not in st.session_state:
+    st.session_state.last_params = None
 
-# ------------------- دوال أساسية مشتركة -------------------
-def get_fractional_indices(y, eps=0.01):
-    return np.where((y > eps) & (y < 1 - eps))[0]
-
-def compute_R(y):
-    return np.max(np.minimum(np.abs(y), np.abs(1 - y)))
-
-def generate_biased_directions(y_lp, frac_idx, count, alpha, bias_strength=0.5):
-    n_free = len(frac_idx)
-    if y_lp is None or n_free == 0:
-        dirs = np.random.randn(count, max(1, n_free))
-        dirs = dirs / (np.linalg.norm(dirs, axis=1, keepdims=True) + 1e-12)
-        return dirs
-    y_frac_target = np.clip(y_lp[frac_idx], 0, 1)
-    base_dir = y_frac_target - 0.5
-    if np.linalg.norm(base_dir) > 0:
-        base_dir = base_dir / np.linalg.norm(base_dir)
-    else:
-        base_dir = np.zeros(n_free)
-    dirs = []
-    for _ in range(count):
-        rand = np.random.randn(n_free)
-        rand = rand / (np.linalg.norm(rand) + 1e-12)
-        u = bias_strength * base_dir + (1 - bias_strength) * rand
-        u = u / (np.linalg.norm(u) + 1e-12)
-        dirs.append(u)
-    return np.array(dirs)
-
-# ------------------- دوال خاصة بـ UFLP -------------------
+# ------------------- دوال الخوارزمية الأساسية -------------------
 def solve_lp_fixed_y_uflp(y_int, f, c):
     open_fac = np.where(y_int > 0.5)[0]
     if len(open_fac) == 0:
@@ -371,54 +276,36 @@ def lp_relaxation_uflp(f, c):
         return y_val, obj
     return None, None
 
-def vcycle_uflp(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
-    cost1, y1 = smooth_uflp(y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
-    if not coarse:
-        return cost1, y1
-    best = cost1
-    best_y = y1
-    n_coarse = len(coarse)
+def get_fractional_indices(y, eps=0.01):
+    return np.where((y > eps) & (y < 1 - eps))[0]
 
-    def evaluate_bits(bits):
-        yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])
-        y_full = y1.copy()
-        for idx, val in zip(coarse, yc):
-            y_full[idx] = val
-        cost = solve_lp_fixed_y_uflp(y_full, f, c)
-        return cost, y_full
+def compute_R(y):
+    return np.max(np.minimum(np.abs(y), np.abs(1 - y)))
 
-    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
-        futures = [executor.submit(evaluate_bits, bits) for bits in range(1 << n_coarse)]
-        for future in as_completed(futures):
-            cost, y_cand = future.result()
-            if cost < best:
-                best = cost
-                best_y = y_cand
-    cost2, y2 = smooth_uflp(best_y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
-    cost3, y3 = local_search_advanced_uflp(y2, cost2, f, c, max_iter=5)
-    return cost3, y3
+def generate_biased_directions(y_lp, frac_idx, count, alpha, bias_strength=0.5):
+    n_free = len(frac_idx)
+    if y_lp is None or n_free == 0:
+        dirs = np.random.randn(count, max(1, n_free))
+        dirs = dirs / (np.linalg.norm(dirs, axis=1, keepdims=True) + 1e-12)
+        return dirs
+    y_frac_target = np.clip(y_lp[frac_idx], 0, 1)
+    base_dir = y_frac_target - 0.5
+    if np.linalg.norm(base_dir) > 0:
+        base_dir = base_dir / np.linalg.norm(base_dir)
+    else:
+        base_dir = np.zeros(n_free)
+    dirs = []
+    for _ in range(count):
+        rand = np.random.randn(n_free)
+        rand = rand / (np.linalg.norm(rand) + 1e-12)
+        u = bias_strength * base_dir + (1 - bias_strength) * rand
+        u = u / (np.linalg.norm(u) + 1e-12)
+        dirs.append(u)
+    return np.array(dirs)
 
-def smooth_uflp(y, f, c, y_lp=None, iters=1, gap_threshold=5.0):
-    best = solve_lp_fixed_y_uflp(y, f, c)
-    best_y = y.copy()
-    for _ in range(iters):
-        R_val = compute_R(y)
-        n_free = len(get_fractional_indices(y))
-        new_cost, new_y = hierarchical_radial_scan_parallel_uflp(
-            y, R_val, n_free, f, c, best, best_y,
-            n_layers=2, dirs_per_layer=8, alpha_schedule='adaptive',
-            y_lp=y_lp, gap_threshold=gap_threshold
-        )
-        if new_cost < best:
-            best = new_cost
-            best_y = new_y
-        else:
-            break
-    return best, best_y
-
-def hierarchical_radial_scan_parallel_uflp(y_center, R, n_free, f, c, best_cost, best_y,
-                                          n_layers=2, dirs_per_layer=10, alpha_schedule='adaptive',
-                                          y_lp=None, gap_threshold=5.0):
+def hierarchical_radial_scan_parallel(y_center, R, n_free, f, c, best_cost, best_y,
+                                      n_layers=2, dirs_per_layer=10, alpha_schedule='adaptive',
+                                      y_lp=None, gap_threshold=5.0):
     frac_idx = get_fractional_indices(y_center)
     if len(frac_idx) == 0:
         return best_cost, best_y
@@ -433,6 +320,7 @@ def hierarchical_radial_scan_parallel_uflp(y_center, R, n_free, f, c, best_cost,
             alpha_k = base_alpha * np.exp(- (layer - 1) / n_layers)
         else:
             alpha_k = (layer / n_layers) * base_alpha
+        # تقنية التسريع: تقليل عدد الاتجاهات عندما تكون الفجوة صغيرة
         if hasattr(st.session_state, 'acceleration') and st.session_state.acceleration:
             dirs_count = max(2, dirs_per_layer // 2)
         else:
@@ -465,7 +353,25 @@ def hierarchical_radial_scan_parallel_uflp(y_center, R, n_free, f, c, best_cost,
         y_frac = y_center[frac_idx].copy()
     return local_best, local_best_y
 
-def local_search_advanced_uflp(y, best_cost, f, c, max_iter=10):
+def smooth(y, f, c, y_lp=None, iters=1, gap_threshold=5.0):
+    best = solve_lp_fixed_y_uflp(y, f, c)
+    best_y = y.copy()
+    for _ in range(iters):
+        R_val = compute_R(y)
+        n_free = len(get_fractional_indices(y))
+        new_cost, new_y = hierarchical_radial_scan_parallel(
+            y, R_val, n_free, f, c, best, best_y,
+            n_layers=2, dirs_per_layer=8, alpha_schedule='adaptive',
+            y_lp=y_lp, gap_threshold=gap_threshold
+        )
+        if new_cost < best:
+            best = new_cost
+            best_y = new_y
+        else:
+            break
+    return best, best_y
+
+def local_search_advanced(y, best_cost, f, c, max_iter=10):
     n = len(f)
     improved = True
     iteration = 0
@@ -555,17 +461,90 @@ def local_search_advanced_uflp(y, best_cost, f, c, max_iter=10):
 
     return best, best_y
 
-def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
-                    use_R, R_tol, stable_gap_needed,
-                    use_cost_repeat, cost_repeat_times,
-                    use_gap_repeat, gap_repeat_times,
-                    use_contraction, diff_tol,
-                    resume_state=None):
+def vcycle(y, f, c, coarse, y_lp=None, gap_threshold=5.0):
+    cost1, y1 = smooth(y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
+    if not coarse:
+        return cost1, y1
+    best = cost1
+    best_y = y1
+    n_coarse = len(coarse)
+
+    def evaluate_bits(bits):
+        yc = np.array([(bits >> i) & 1 for i in range(n_coarse)])
+        y_full = y1.copy()
+        for idx, val in zip(coarse, yc):
+            y_full[idx] = val
+        cost = solve_lp_fixed_y_uflp(y_full, f, c)
+        return cost, y_full
+
+    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        futures = [executor.submit(evaluate_bits, bits) for bits in range(1 << n_coarse)]
+        for future in as_completed(futures):
+            cost, y_cand = future.result()
+            if cost < best:
+                best = cost
+                best_y = y_cand
+    cost2, y2 = smooth(best_y, f, c, y_lp=y_lp, iters=1, gap_threshold=gap_threshold)
+    cost3, y3 = local_search_advanced(y2, cost2, f, c, max_iter=5)
+    return cost3, y3
+
+def read_instance_from_text(text):
+    lines = text.strip().splitlines()
+    clean_lines = []
+    for line in lines:
+        line = line.strip()
+        if line and not line.startswith('#') and not line.startswith('!') and not line.upper().startswith('FILE:'):
+            clean_lines.append(line)
+    if len(clean_lines) < 2:
+        raise ValueError("الملف لا يحتوي على بيانات كافية.")
+    n, m = None, None
+    data_start = -1
+    for idx, line in enumerate(clean_lines):
+        parts = line.split()
+        if len(parts) >= 2:
+            try:
+                n_cand = int(parts[0])
+                m_cand = int(parts[1])
+                if n_cand > 0 and m_cand > 0:
+                    n, m = n_cand, m_cand
+                    data_start = idx
+                    break
+            except:
+                continue
+    if n is None or m is None:
+        raise ValueError("لم يتم العثور على سطر صالح يحتوي على n و m.")
+    f = np.zeros(n, dtype=float)
+    c = np.zeros((n, m), dtype=float)
+    for i in range(n):
+        if data_start + 1 + i >= len(clean_lines):
+            raise ValueError(f"الملف لا يحتوي على {n} سطراً من البيانات.")
+        line = clean_lines[data_start + 1 + i]
+        parts = line.split()
+        if len(parts) == 1 + m:
+            f[i] = float(parts[0])
+            for j in range(m):
+                c[i, j] = float(parts[1 + j])
+        elif len(parts) >= 2 + m:
+            idx = int(parts[0]) - 1
+            f[idx] = float(parts[1])
+            for j in range(m):
+                c[idx, j] = float(parts[2 + j])
+        else:
+            raise ValueError(f"السطر {data_start+1+i+1} لا يحتوي على العدد المناسب من القيم.")
+    return f, c, n, m
+
+def solve_ahrh_with_log(f, c, max_cycles, k_coarse, patience,
+                        use_R, R_tol, stable_gap_needed,
+                        use_cost_repeat, cost_repeat_times,
+                        use_gap_repeat, gap_repeat_times,
+                        use_contraction, diff_tol,
+                        resume_state=None):
     n, m = len(f), c.shape[1]
     y_lp, lp_val = lp_relaxation_uflp(f, c)
     if lp_val is None or lp_val == 0:
         lp_val = 1e-12  # تجنب القسمة على صفر
 
+    # استعادة الحالة إذا وجدت
     if resume_state is not None:
         y = resume_state['y']
         best = resume_state['best']
@@ -587,23 +566,16 @@ def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
         start_cycle = resume_state['cycle'] + 1
         total_time_so_far = resume_state['total_time_so_far']
     else:
-        # استخدام حل LP التقريبي كنقطة بداية أفضل
+        # نقطة البداية المحسنة: استخدام حل LP التقريبي
         if y_lp is not None:
             y = (y_lp > 0.5).astype(int)
+            if np.sum(y) == 0:
+                cheapest = np.argmin(f)
+                y[cheapest] = 1
         else:
             y = np.ones(n, dtype=int)
         best = solve_lp_fixed_y_uflp(y, f, c)
-        # إذا كان الحل غير ممكن، نفتح جميع المرافق
-        if best == float('inf'):
-          # استخدام حل LP التقريبي كنقطة بداية أفضل
-if y_lp is not None:
-    y = (y_lp > 0.5).astype(int)
-    if np.sum(y) == 0:  # إذا لم يتم فتح أي مرفق
-        cheapest = np.argmin(f)
-        y[cheapest] = 1
-else:
-    y = np.ones(n, dtype=int)
-best = solve_lp_fixed_y_uflp(y, f, c)
+
         cycles_log = []
         gap_history = []
         R_history = []
@@ -622,9 +594,448 @@ best = solve_lp_fixed_y_uflp(y, f, c)
         start_cycle = 0
         total_time_so_far = 0.0
 
-    progress_bar = st.progress(start_cycle / max_cycles if max_cycles>0 else 0)
+    progress_bar = st.progress(start_cycle / max_cycles if max_cycles > 0 else 0)
     status_placeholder = st.empty()
     details_placeholder = st.empty()
     start_time = time.time()
 
-   
+    cycle = start_cycle
+    while cycle < max_cycles:
+        # التحقق من حالة الإيقاف المؤقت
+        if st.session_state.get('paused', False):
+            st.session_state.resume_state = {
+                'y': y,
+                'best': best,
+                'cycles_log': cycles_log,
+                'gap_history': gap_history,
+                'R_history': R_history,
+                'diff_history': diff_history,
+                'no_improve': no_improve,
+                'cycles_done': cycle,
+                'stop_reason': stop_reason,
+                'acceleration_active': acceleration_active,
+                'cost_repeat_count': cost_repeat_count,
+                'gap_repeat_count': gap_repeat_count,
+                'stable_gap_count': stable_gap_count,
+                'last_cost': last_cost,
+                'last_gap': last_gap,
+                'last_R': last_R,
+                'last_y': last_y,
+                'cycle': cycle,
+                'total_time_so_far': total_time_so_far + (time.time() - start_time)
+            }
+            st.info(t('paused_message'))
+            break
+
+        # اختيار المجموعة الخشنة
+        if y_lp is not None:
+            open_now = np.where(y > 0.5)[0].tolist()
+            top_lp = np.argsort(-y_lp)[:k_coarse].tolist()
+            coarse = list(set(open_now + top_lp))
+            if len(coarse) > 10:
+                importance = [(i, y_lp[i]) for i in coarse]
+                importance.sort(key=lambda x: x[1], reverse=True)
+                coarse = [i for i, _ in importance[:10]]
+        else:
+            coarse = []
+
+        # تفعيل/إلغاء وضع التسريع
+        if acceleration_active:
+            st.session_state.acceleration = True
+        else:
+            st.session_state.acceleration = False
+
+        new_cost, new_y = vcycle(y, f, c, coarse, y_lp=y_lp, gap_threshold=3.0)
+        gap = (new_cost - lp_val) / lp_val * 100
+        R_val = compute_R(new_y)
+        diff = np.linalg.norm(new_y - last_y)
+
+        improved = new_cost < best - 1e-6
+        if improved:
+            best = new_cost
+            y = new_y
+            no_improve = 0
+        else:
+            no_improve += 1
+
+        gap_history.append(gap)
+        R_history.append(R_val)
+        diff_history.append(diff)
+        cycles_log.append({
+            'cycle': cycle+1,
+            'cost': new_cost,
+            'gap': gap,
+            'R': R_val,
+            'diff': diff,
+            'improved': improved,
+            'best_so_far': best
+        })
+
+        # تحديث شريط التقدم
+        progress_bar.progress((cycle + 1) / max_cycles)
+        status_placeholder.info(f"**Cycle {cycle+1} / {max_cycles}**")
+        details_placeholder.markdown(
+            f"**Current cost:** {new_cost:,.2f}  \n"
+            f"**Gap:** {gap:.4f}%  \n"
+            f"**R:** {R_val:.6f}  \n"
+            f"**Improved:** {'✅' if improved else '❌'}  \n"
+            f"**Best so far:** {best:,.2f}"
+        )
+        time.sleep(0.1)
+
+        # تحديث حالة التسريع (تقنية التسريع عند فجوة < 2%)
+        if not acceleration_active and gap < 2.0 and R_val < 0.01:
+            acceleration_active = True
+            st.session_state.acceleration = True
+            st.info(t('acceleration_on'))
+        elif acceleration_active and (gap >= 2.0 or R_val >= 0.01):
+            acceleration_active = False
+            st.session_state.acceleration = False
+
+        # معايير التوقف
+        stop_now = False
+
+        # 1. Patience
+        if no_improve >= patience:
+            stop_reason = f"Patience ({patience} cycles without improvement)"
+            stop_now = True
+
+        # 2. R + gap stability
+        if not stop_now and use_R and R_val < R_tol:
+            if last_gap is not None and abs(gap - last_gap) < 1e-6:
+                stable_gap_count += 1
+                if stable_gap_count >= stable_gap_needed:
+                    stop_reason = f"R < {R_tol} and gap stable for {stable_gap_needed} cycles"
+                    stop_now = True
+            else:
+                stable_gap_count = 0
+
+        # 3. Cost repetition
+        if not stop_now and use_cost_repeat:
+            if last_cost is not None and abs(new_cost - last_cost) < 1e-6:
+                cost_repeat_count += 1
+                if cost_repeat_count >= cost_repeat_times:
+                    stop_reason = f"Cost repeated {cost_repeat_times} times"
+                    stop_now = True
+            else:
+                cost_repeat_count = 0
+
+        # 4. Gap repetition
+        if not stop_now and use_gap_repeat:
+            if last_gap is not None and abs(gap - last_gap) < 1e-6:
+                gap_repeat_count += 1
+                if gap_repeat_count >= gap_repeat_times:
+                    stop_reason = f"Gap repeated {gap_repeat_times} times"
+                    stop_now = True
+            else:
+                gap_repeat_count = 0
+
+        # 5. Contraction (diff + R)
+        if not stop_now and use_contraction:
+            if diff < diff_tol and R_val < R_tol:
+                stop_reason = f"Contraction: diff < {diff_tol} and R < {R_tol}"
+                stop_now = True
+
+        # تحديث القيم السابقة
+        last_cost = new_cost
+        last_gap = gap
+        last_R = R_val
+        last_y = new_y.copy()
+
+        if stop_now:
+            cycles_done = cycle + 1
+            break
+
+        cycle += 1
+
+    # حساب الوقت الإجمالي
+    total_time = total_time_so_far + (time.time() - start_time)
+
+    if cycle >= max_cycles:
+        cycles_done = max_cycles
+        stop_reason = f"Max cycles ({max_cycles}) reached"
+        if 'resume_state' in st.session_state:
+            st.session_state.resume_state = None
+        st.session_state.paused = False
+
+    progress_bar.empty()
+    status_placeholder.empty()
+    details_placeholder.empty()
+
+    if acceleration_active:
+        st.info(t('acceleration_on'))
+
+    return {
+        'best_cost': best,
+        'lp_val': lp_val,
+        'gap': (best - lp_val) / lp_val * 100,
+        'open_fac': len(np.where(y > 0.5)[0]),
+        'cycles_done': cycles_done,
+        'gap_history': gap_history,
+        'R_history': R_history,
+        'diff_history': diff_history,
+        'cycles_log': cycles_log,
+        'stop_reason': stop_reason,
+        'acceleration_active': acceleration_active,
+        'total_time': total_time
+    }
+
+# ------------------- واجهة Streamlit -------------------
+st.set_page_config(page_title="AHRH Solver - UFLP", layout="wide")
+
+col1, col2 = st.columns([4, 1])
+with col2:
+    language = st.selectbox("", ['English', 'Français', 'العربية'], key='language_selector')
+    st.session_state.language = language
+
+st.title(t('app_title'))
+st.markdown(t('app_desc'))
+st.markdown(f"- {t('feature1')}\n- {t('feature2')}\n- {t('feature3')}\n- {t('feature4')}\n- {t('feature5')}\n- {t('feature6')}\n- {t('feature7')}")
+
+with st.sidebar:
+    st.header(t('sidebar_algo'))
+    max_cycles = st.slider(t('max_cycles'), 5, 150, 15, 5)
+    k_coarse = st.slider(t('k_coarse'), 3, 10, 5)
+    patience = st.slider(t('patience'), 2, 10, 3)
+
+    st.header(t('sidebar_stop'))
+    st.markdown(t('choose_criteria'))
+
+    use_R = st.checkbox(t('use_R'), value=False)
+    if use_R:
+        R_tol = st.number_input(t('R_tol'), value=1e-6, format="%.0e", step=1e-6)
+        stable_gap_needed = st.number_input(t('stable_gap'), min_value=1, max_value=5, value=2)
+    else:
+        R_tol, stable_gap_needed = 1e-6, 2
+
+    use_cost_repeat = st.checkbox(t('use_cost_repeat'), value=False)
+    if use_cost_repeat:
+        cost_repeat_times = st.number_input(t('cost_repeat_times'), min_value=2, max_value=10, value=2)
+    else:
+        cost_repeat_times = 2
+
+    use_gap_repeat = st.checkbox(t('use_gap_repeat'), value=False)
+    if use_gap_repeat:
+        gap_repeat_times = st.number_input(t('gap_repeat_times'), min_value=2, max_value=10, value=2)
+    else:
+        gap_repeat_times = 2
+
+    use_contraction = st.checkbox(t('use_contraction'), value=True)
+    if use_contraction:
+        diff_tol = st.number_input(t('diff_tol'), value=1e-12, format="%.0e", step=1e-12)
+    else:
+        diff_tol = 1e-12
+
+    st.markdown("---")
+    st.write(f"{t('workers')}: {NUM_WORKERS}")
+
+    # لوحة التحكم - أزرار الإيقاف المؤقت والاستئناف
+    st.markdown("---")
+    st.subheader(t('control_panel'))
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        if st.button(t('pause_button')):
+            st.session_state.paused = True
+    with col_p2:
+        if st.button(t('resume_button')):
+            st.session_state.paused = False
+            if st.session_state.resume_state is not None and st.session_state.last_params is not None:
+                params = st.session_state.last_params
+                with st.spinner("استئناف التشغيل..."):
+                    result = solve_ahrh_with_log(
+                        params['f'], params['c'],
+                        params['max_cycles'], params['k_coarse'], params['patience'],
+                        params['use_R'], params['R_tol'], params['stable_gap_needed'],
+                        params['use_cost_repeat'], params['cost_repeat_times'],
+                        params['use_gap_repeat'], params['gap_repeat_times'],
+                        params['use_contraction'], params['diff_tol'],
+                        resume_state=st.session_state.resume_state
+                    )
+                    st.session_state.result = result
+                    st.rerun()
+
+# تبويبان فقط (تم حذف العشوائي)
+tab1, tab2 = st.tabs([t('tab_upload'), t('tab_manual')])
+
+with tab1:
+    st.header(t('upload_header'))
+    st.info(t('upload_info'))
+    uploaded_file = st.file_uploader(t('choose_file'), type=None)
+    if uploaded_file is not None:
+        with st.spinner("Reading file and running algorithm..."):
+            try:
+                text = uploaded_file.getvalue().decode("utf-8")
+            except:
+                text = uploaded_file.getvalue().decode("latin-1")
+            try:
+                f, c, n, m = read_instance_from_text(text)
+                st.success(f"File loaded: {n} facilities, {m} customers")
+                # تخزين المعاملات للاستئناف
+                st.session_state.last_params = {
+                    'f': f,
+                    'c': c,
+                    'max_cycles': max_cycles,
+                    'k_coarse': k_coarse,
+                    'patience': patience,
+                    'use_R': use_R,
+                    'R_tol': R_tol,
+                    'stable_gap_needed': stable_gap_needed,
+                    'use_cost_repeat': use_cost_repeat,
+                    'cost_repeat_times': cost_repeat_times,
+                    'use_gap_repeat': use_gap_repeat,
+                    'gap_repeat_times': gap_repeat_times,
+                    'use_contraction': use_contraction,
+                    'diff_tol': diff_tol,
+                }
+                result = solve_ahrh_with_log(
+                    f, c,
+                    max_cycles, k_coarse, patience,
+                    use_R, R_tol, stable_gap_needed,
+                    use_cost_repeat, cost_repeat_times,
+                    use_gap_repeat, gap_repeat_times,
+                    use_contraction, diff_tol,
+                    resume_state=None
+                )
+                st.session_state['result'] = result
+                st.session_state['n'] = n
+                st.session_state['m'] = m
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
+
+with tab2:
+    st.header(t('manual_header'))
+    st.warning(t('manual_warning'))
+    col1, col2 = st.columns(2)
+    with col1:
+        n_man = st.number_input(t('manual_n'), min_value=1, max_value=10, value=3, step=1, key="n_man")
+    with col2:
+        m_man = st.number_input(t('manual_m'), min_value=1, max_value=10, value=3, step=1, key="m_man")
+
+    if 'f_man' not in st.session_state or st.session_state.get('n_man_prev') != n_man:
+        st.session_state['f_man'] = np.zeros(n_man)
+        st.session_state['n_man_prev'] = n_man
+    if 'c_man' not in st.session_state or st.session_state.get('n_man_prev') != n_man or st.session_state.get('m_man_prev') != m_man:
+        st.session_state['c_man'] = np.zeros((n_man, m_man))
+        st.session_state['m_man_prev'] = m_man
+
+    st.subheader(t('manual_f'))
+    f_vals = []
+    cols = st.columns(min(5, n_man))
+    for i in range(n_man):
+        with cols[i % 5]:
+            val = st.number_input(f"f[{i}]", value=float(st.session_state['f_man'][i]), key=f"f_man_{i}")
+            f_vals.append(val)
+    st.session_state['f_man'] = np.array(f_vals)
+
+    st.subheader(t('manual_c'))
+    c_vals = np.zeros((n_man, m_man))
+    for i in range(n_man):
+        st.write(f"**{t('manual_c')} {i}:**")
+        cols = st.columns(min(5, m_man))
+        for j in range(m_man):
+            with cols[j % 5]:
+                val = st.number_input(f"c[{i}][{j}]", value=float(st.session_state['c_man'][i, j]), key=f"c_man_{i}_{j}")
+                c_vals[i, j] = val
+    st.session_state['c_man'] = c_vals
+
+    if st.button(t('solve_button'), key="solve_manual"):
+        with st.spinner("Running algorithm..."):
+            # تخزين المعاملات للاستئناف
+            st.session_state.last_params = {
+                'f': st.session_state['f_man'],
+                'c': st.session_state['c_man'],
+                'max_cycles': max_cycles,
+                'k_coarse': k_coarse,
+                'patience': patience,
+                'use_R': use_R,
+                'R_tol': R_tol,
+                'stable_gap_needed': stable_gap_needed,
+                'use_cost_repeat': use_cost_repeat,
+                'cost_repeat_times': cost_repeat_times,
+                'use_gap_repeat': use_gap_repeat,
+                'gap_repeat_times': gap_repeat_times,
+                'use_contraction': use_contraction,
+                'diff_tol': diff_tol,
+            }
+            result = solve_ahrh_with_log(
+                st.session_state['f_man'], st.session_state['c_man'],
+                max_cycles, k_coarse, patience,
+                use_R, R_tol, stable_gap_needed,
+                use_cost_repeat, cost_repeat_times,
+                use_gap_repeat, gap_repeat_times,
+                use_contraction, diff_tol,
+                resume_state=None
+            )
+            st.session_state['result'] = result
+            st.session_state['n'] = n_man
+            st.session_state['m'] = m_man
+            st.success("Done!")
+
+# ------------------- عرض النتائج -------------------
+st.markdown("---")
+st.header(t('results'))
+
+if 'result' in st.session_state:
+    res = st.session_state['result']
+    colA, colB, colC, colD = st.columns(4)
+    colA.metric(t('best_cost'), f"{res['best_cost']:,.0f}")
+    colB.metric(t('lp_val'), f"{res['lp_val']:,.0f}")
+    colC.metric(t('gap'), f"{res['gap']:.4f}%")
+    colD.metric(t('open_fac'), res['open_fac'])
+
+    colE, colF, colG = st.columns(3)
+    colE.metric(t('cycles_done'), res['cycles_done'])
+    colF.metric(t('time'), f"{res['total_time']:.2f}")
+    colG.metric(t('size'), f"{st.session_state['n']}×{st.session_state['m']}")
+
+    st.info(f"**{t('stop_reason')}:** {res['stop_reason']}")
+    if res.get('acceleration_active'):
+        st.success(t('acceleration_on'))
+
+    if res['gap_history']:
+        st.subheader(t('gap_plot'))
+        fig, ax1 = plt.subplots(figsize=(10, 5))
+        cycles = list(range(1, len(res['gap_history'])+1))
+        ax1.plot(cycles, res['gap_history'], 'b-o', label=t('gap_label'))
+        ax1.set_xlabel(t('cycle'))
+        ax1.set_ylabel(t('gap_label'), color='b')
+        ax1.tick_params(axis='y', labelcolor='b')
+        ax2 = ax1.twinx()
+        ax2.plot(cycles, res['R_history'], 'r-s', label=t('R_label'))
+        ax2.set_ylabel(t('R_label'), color='r')
+        ax2.tick_params(axis='y', labelcolor='r')
+        plt.title(t('gap_plot'))
+        fig.tight_layout()
+        st.pyplot(fig)
+
+        st.subheader(t('cycle_log'))
+        df_cycles = pd.DataFrame(res['cycles_log'])
+        df_cycles = df_cycles.rename(columns={
+            'cycle': t('cycle'),
+            'cost': t('cost'),
+            'gap': t('gap'),
+            'R': 'R',
+            'diff': 'Diff',
+            'improved': t('improved'),
+            'best_so_far': t('best_so_far')
+        })
+        df_cycles[t('improved')] = df_cycles[t('improved')].apply(lambda x: t('yes') if x else t('no'))
+        st.dataframe(df_cycles, use_container_width=True)
+
+        df = pd.DataFrame({
+            t('cycle'): cycles,
+            t('gap_label'): res['gap_history'],
+            'R': res['R_history']
+        })
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label=t('download'),
+            data=csv,
+            file_name="evolution.csv",
+            mime="text/csv"
+        )
+else:
+    st.info(t('info_placeholder'))
+
+st.markdown("---")
+st.caption(t('footer'))
