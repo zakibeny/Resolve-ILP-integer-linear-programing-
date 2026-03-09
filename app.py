@@ -1,25 +1,31 @@
-import streamlit as st
-import sys
-import traceback
+# ------------------- قسم إرسال التعليقات إلى GitHub (معدل) -------------------
+st.markdown("---")
+st.header(t('feedback_section'))
 
+# قراءة معلومات المستودع من secrets بشكل آمن
 try:
-    # ------------------- الكود الكامل للتطبيق -------------------
-    # (ضع هنا كل الدوال والواجهة التي كانت لديك سابقًا)
-    # ولكن تأكد من أن جميع الدوال معرفة قبل استخدامها
-    # بما في ذلك الترجمات، uflp_to_ilp، solve_ahrh، إلخ.
-    
-    # على سبيل المثال، سأضع نسخة مبسطة للاختبار:
-    st.set_page_config(page_title="AHRH Solver", layout="wide")
-    st.title("AHRH Solver - اختبار")
-    st.write("إذا رأيت هذه الرسالة، فالتطبيق يعمل.")
-    
-    # هنا يجب أن تضع كل الكود الأصلي (الدوال، الواجهة، إلخ)
-    # ... 
-    
-except Exception as e:
-    # كتابة الخطأ إلى stderr ليظهر في السجلات
-    sys.stderr.write("❌ خطأ في app.py:\n")
-    sys.stderr.write(str(e) + "\n")
-    sys.stderr.write(traceback.format_exc() + "\n")
-    # إعادة رفع الاستثناء لإيقاف التطبيق (اختياري)
-    raise
+    REPO_OWNER = st.secrets.get("REPO_OWNER", "zakibeny")
+    REPO_NAME = st.secrets.get("REPO_NAME", "resolve-ilp-integer-linear-programing-")
+    GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
+except Exception:
+    # في حالة عدم وجود secrets (بيئة محلية)
+    REPO_OWNER = "zakibeny"
+    REPO_NAME = "resolve-ilp-integer-linear-programing-"
+    GITHUB_TOKEN = ""
+
+if not GITHUB_TOKEN:
+    st.warning(t('feedback_missing_token'))
+else:
+    with st.form("feedback_form"):
+        user_comment = st.text_area(t('feedback_section'), height=150,
+                                     placeholder=t('feedback_placeholder'))
+        submitted = st.form_submit_button(t('feedback_submit'))
+        if submitted and user_comment.strip():
+            with st.spinner("جاري الإرسال..."):
+                success, result = send_to_github_issue(user_comment, REPO_OWNER, REPO_NAME, GITHUB_TOKEN)
+                if success:
+                    st.success(f"{t('feedback_success')} [{result}]({result})")
+                else:
+                    st.error(f"{t('feedback_error')} {result}")
+        elif submitted:
+            st.warning(t('feedback_warning'))
