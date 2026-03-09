@@ -1102,7 +1102,7 @@ st.markdown(f"- {t('feature1')}\n- {t('feature2')}\n- {t('feature3')}\n- {t('fea
 
 with st.sidebar:
     st.header(t('sidebar_algo'))
-    max_cycles = st.slider(t('max_cycles'), 50, 150, 15, 5)
+    max_cycles = st.slider(t('max_cycles'), 5, 15, 15, 150)
     k_coarse = st.slider(t('k_coarse'), 3, 10, 5)
     patience = st.slider(t('patience'), 2, 10, 3)
 
