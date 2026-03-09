@@ -1245,7 +1245,7 @@ with st.sidebar:
 
     # أزرار التحكم في التشغيل
     st.markdown("---")
-    st.subheader("⏯️ " + t('pause_button') if 'pause_button' in t else "Pause/Resume")
+    st.subheader("⏯️ " + t('pause_button'))
     col_p1, col_p2 = st.columns(2)
     with col_p1:
         if st.button(t('pause_button')):
