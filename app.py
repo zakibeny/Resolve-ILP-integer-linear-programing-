@@ -595,9 +595,15 @@ def solve_ahrh_uflp(f, c, max_cycles, k_coarse, patience,
         best = solve_lp_fixed_y_uflp(y, f, c)
         # إذا كان الحل غير ممكن، نفتح جميع المرافق
         if best == float('inf'):
-            y = np.ones(n, dtype=int)
-            best = solve_lp_fixed_y_uflp(y, f, c)
-
+          # استخدام حل LP التقريبي كنقطة بداية أفضل
+if y_lp is not None:
+    y = (y_lp > 0.5).astype(int)
+    if np.sum(y) == 0:  # إذا لم يتم فتح أي مرفق
+        cheapest = np.argmin(f)
+        y[cheapest] = 1
+else:
+    y = np.ones(n, dtype=int)
+best = solve_lp_fixed_y_uflp(y, f, c)
         cycles_log = []
         gap_history = []
         R_history = []
