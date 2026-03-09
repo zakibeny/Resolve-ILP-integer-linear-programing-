@@ -1,10 +1,5 @@
-
-تطبيق AHRH لحل مسائل البرمجة الصحيحة (ILP) و UFLP
-مع معالجة UFLP كحالة خاصة من ILP (تحويل تلقائي)
-واجهة متعددة اللغات، عرض التقدم، معايير توقف متعددة، وإرسال التعليقات إلى GitHub Issues
-مع معالجة آمنة للأخطاء و st.secrets
-"""
-
+```python
+# -*- coding: utf-8 -*-
 import streamlit as st
 import numpy as np
 import pulp
@@ -41,7 +36,7 @@ CONTACT_FAX = "036495241"
 # ------------------- إعدادات التوازي -------------------
 NUM_WORKERS = 4
 
-# ------------------- ترجمة النصوص (عربي/إنجليزي/فرنسي) -------------------
+# ------------------- ترجمة النصوص -------------------
 translations = {
     'العربية': {
         'app_title': '🧠 AHRH: خوارزمية هرمية انكماشية متطورة',
@@ -743,7 +738,6 @@ def solve_ahrh(obj, A, b, uflp_info, sense, max_cycles, k_coarse, patience,
 # ------------------- واجهة Streamlit -------------------
 st.set_page_config(page_title="AHRH Solver - Unified ILP/UFLP", layout="wide")
 
-# تعديل selectbox لإزالة تحذير التسمية الفارغة
 col1, col2 = st.columns([4, 1])
 with col2:
     language = st.selectbox(
@@ -756,7 +750,6 @@ with col2:
 
 st.title(t('app_title'))
 
-# معلومات الاتصال
 st.markdown(f"""
 <div style="background-color: #ffeeee; padding: 20px; border-radius: 15px; text-align: center; margin: 20px 0; border: 3px solid red;">
     <span style="color: red; font-size: 32px; font-weight: bold;">✉️ {CONTACT_EMAIL}</span><br>
@@ -1066,7 +1059,6 @@ if 'result' in st.session_state:
             'best_so_far': t('best_so_far')
         })
         df_cycles[t('improved')] = df_cycles[t('improved')].apply(lambda x: t('yes') if x else t('no'))
-        # استبدال use_container_width بـ width (لـ Streamlit >= 1.55)
         st.dataframe(df_cycles, width='stretch')
         df = pd.DataFrame({
             t('cycle'): cycles,
@@ -1087,7 +1079,6 @@ else:
 st.markdown("---")
 st.header(t('feedback_section'))
 
-# قراءة معلومات المستودع من secrets بشكل آمن
 try:
     REPO_OWNER = st.secrets.get("REPO_OWNER", "zakibeny")
     REPO_NAME = st.secrets.get("REPO_NAME", "resolve-ilp-integer-linear-programing-")
