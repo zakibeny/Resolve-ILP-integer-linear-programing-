@@ -3,7 +3,6 @@
 """
 AHRH Integer Programming Solver Application
 """
-
 import streamlit as st
 import numpy as np
 import pulp
@@ -1145,3 +1144,4 @@ st.caption(t('footer'))
 if os.path.exists(STATE_FILE) and 'result' in st.session_state:
     # Optionally keep state file for resuming later
     pass
+```
