@@ -1,3 +1,6 @@
+أرى أنك تريد دمج الميزات من البرنامج القديم مع البرنامج الجديد. سأقوم بإنشاء برنامج كامل يجمع كل الميزات المطلوبة:
+
+```python
 # -*- coding: utf-8 -*-
 """
 AHRH: حل مسائل البرمجة الصحيحة (ILP/MILP) ومسائل مواقع المرافق (UFLP)
@@ -697,4 +700,819 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
 
     if resume and len(history) > 0:
         cycles_log = history
-        gap_history = [h['gap']]
+        gap_history = [h['gap'] for h in history]
+        R_history = [h['R'] for h in history]
+        diff_history = [h.get('diff', 0) for h in history]
+        last_cost = history[-1]['cost']
+        last_gap = history[-1]['gap']
+        last_R = history[-1]['R']
+        last_x = np.array(history[-1].get('best_so_far', x))
+        acceleration_active = history[-1].get('acceleration', False)
+
+    progress_bar = st.progress(0)
+    status_placeholder = st.empty()
+    details_placeholder = st.empty()
+    time_placeholder = st.empty()
+    pause_button_placeholder = st.empty()
+
+    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        for cycle in range(start_cycle, max_cycles+1):
+            while st.session_state.paused:
+                time.sleep(0.5)
+                if st.session_state.stop_requested:
+                    st.session_state.stop_requested = False
+                    st.session_state.paused = False
+                    break
+            
+            if x_lp is not None:
+                open_now = np.where(x > 0.5)[0].tolist()
+                top_lp = np.argsort(-x_lp)[:k_coarse].tolist()
+                coarse = list(set(open_now + top_lp))
+                if len(coarse) > 10:
+                    importance = [(i, x_lp[i]) for i in coarse]
+                    importance.sort(key=lambda x: x[1], reverse=True)
+                    coarse = [i for i, _ in importance[:10]]
+            else:
+                coarse = []
+            
+            if acceleration_active:
+                st.session_state.acceleration = True
+            else:
+                st.session_state.acceleration = False
+            
+            new_cost, new_x = vcycle(x, obj, A, b, coarse, x_lp, best_cost, uflp_info)
+            gap = (new_cost - lp_val) / lp_val * 100 if lp_val not in [0, float('inf')] else 0
+            R_val = compute_R(new_x)
+            diff = np.linalg.norm(new_x - last_x)
+            improved = new_cost < best_cost - 1e-6
+            
+            if improved:
+                best_cost = new_cost
+                x = new_x
+                no_improve = 0
+            else:
+                no_improve += 1
+            
+            gap_history.append(gap)
+            R_history.append(R_val)
+            diff_history.append(diff)
+            
+            entry = {
+                'cycle': cycle,
+                'cost': new_cost,
+                'gap': gap,
+                'R': R_val,
+                'diff': diff,
+                'improved': improved,
+                'best_so_far': best_cost,
+                'acceleration': acceleration_active
+            }
+            cycles_log.append(entry)
+            
+            progress = (cycle - start_cycle + 1) / (max_cycles - start_cycle + 1)
+            progress_bar.progress(progress)
+            
+            elapsed = total_time + (time.time() - start_time)
+            if cycle > start_cycle:
+                avg_time = elapsed / (cycle - start_cycle + 1)
+                remaining = avg_time * (max_cycles - cycle)
+            else:
+                remaining = 0
+            
+            status_placeholder.info(f"**🔵 Cycle {cycle} / {max_cycles}**")
+            details_placeholder.markdown(
+                f"""
+                <div style="background-color: #fff3f3; padding: 15px; border-radius: 10px; border-left: 8px solid #ff4b4b; margin: 10px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h4 style="color: #ff4b4b; margin: 0; font-size: 20px;">📊 معلومات التقدم</h4>
+                    <p style="font-size: 18px;"><b>💰 التكلفة الحالية:</b> {new_cost:,.2f}</p>
+                    <p style="font-size: 18px;"><b>📈 الفجوة:</b> {gap:.4f}%</p>
+                    <p style="font-size: 18px;"><b>🎯 R:</b> {R_val:.6f}</p>
+                    <p style="font-size: 18px;"><b>✨ تحسن:</b> {'✅' if improved else '❌'}</p>
+                    <p style="font-size: 18px;"><b>🏆 أفضل تكلفة:</b> {best_cost:,.2f}</p>
+                    <p style="font-size: 16px; color: #666;"><b>⏱️ وقت الدورة:</b> {time.time() - (start_time + total_time - elapsed):.3f} ث</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            time_placeholder.markdown(
+                f"""
+                <div style="background-color: #e3f2fd; padding: 15px; border-radius: 10px; border-left: 8px solid #2196f3; margin: 10px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h4 style="color: #2196f3; margin: 0; font-size: 20px;">⏱️ الوقت</h4>
+                    <p style="font-size: 18px;"><b>⏰ {t('elapsed_time')}:</b> {elapsed:.2f} ث</p>
+                    <p style="font-size: 18px;"><b>⏳ {t('estimated_remaining')}:</b> {remaining:.2f} ث</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            
+            if pause_button_placeholder.button(t('pause' if not st.session_state.paused else 'resume'), key=f"pause_{cycle}"):
+                st.session_state.paused = not st.session_state.paused
+                if st.session_state.paused:
+                    st.info(f"⏸️ {t('paused')}")
+            
+            if not acceleration_active and gap < 2.0 and R_val < 0.01:
+                acceleration_active = True
+                st.success(f"⚡ {t('acceleration_on')}")
+            
+            stop_now = False
+            if no_improve >= patience:
+                stop_reason = f"{t('patience')} ({patience})"
+                stop_now = True
+            if not stop_now and use_R and R_val < R_tol:
+                if last_gap is not None and abs(gap - last_gap) < 1e-6:
+                    stable_gap_count += 1
+                    if stable_gap_count >= stable_gap_needed:
+                        stop_reason = f"R < {R_tol}"
+                        stop_now = True
+                else:
+                    stable_gap_count = 0
+            if not stop_now and use_cost_repeat:
+                if last_cost is not None and abs(new_cost - last_cost) < 1e-6:
+                    cost_repeat_count += 1
+                    if cost_repeat_count >= cost_repeat_times:
+                        stop_reason = t('use_cost_repeat')
+                        stop_now = True
+                else:
+                    cost_repeat_count = 0
+            if not stop_now and use_gap_repeat:
+                if last_gap is not None and abs(gap - last_gap) < 1e-6:
+                    gap_repeat_count += 1
+                    if gap_repeat_count >= gap_repeat_times:
+                        stop_reason = t('use_gap_repeat')
+                        stop_now = True
+                else:
+                    gap_repeat_count = 0
+            if not stop_now and use_contraction:
+                if diff < diff_tol and R_val < R_tol:
+                    stop_reason = t('use_contraction')
+                    stop_now = True
+            
+            last_cost = new_cost
+            last_gap = gap
+            last_R = R_val
+            last_x = new_x.copy()
+            
+            if time.time() - last_save_time > 5:
+                problem_data = {
+                    'type': 'UFLP' if uflp_info else 'ILP',
+                    'n': n,
+                }
+                save_state(STATE_FILE, cycle, best_cost, x, cycles_log, lp_val, elapsed, problem_data)
+                last_save_time = time.time()
+            
+            if stop_now:
+                cycles_done = cycle
+                break
+    
+    if cycles_done == 0:
+        cycles_done = max_cycles
+        stop_reason = f"{t('max_cycles')} ({max_cycles})"
+    
+    total_time = elapsed
+    
+    progress_bar.empty()
+    status_placeholder.empty()
+    details_placeholder.empty()
+    time_placeholder.empty()
+    pause_button_placeholder.empty()
+    
+    return {
+        'best_cost': best_cost,
+        'lp_val': lp_val,
+        'gap': (best_cost - lp_val) / lp_val * 100 if lp_val not in [0, float('inf')] else 0,
+        'cycles_done': cycles_done,
+        'gap_history': gap_history,
+        'R_history': R_history,
+        'diff_history': diff_history,
+        'cycles_log': cycles_log,
+        'stop_reason': stop_reason,
+        'acceleration_active': acceleration_active,
+        'total_time': total_time,
+        'open_fac': len(np.where(x > 0.5)[0]) if uflp_info else None
+    }
+
+# ------------------- Streamlit Interface -------------------
+st.set_page_config(
+    page_title="AHRH ILP/MILP/UFLP Solver", 
+    page_icon="🧠", 
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS
+st.markdown("""
+<style>
+    .main-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 25px;
+        border-radius: 15px;
+        color: white;
+        text-align: center;
+        margin-bottom: 25px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
+    .info-box {
+        background-color: #e8f0fe;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 8px solid #2196f3;
+        margin: 15px 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .success-box {
+        background-color: #e8f5e8;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 8px solid #4caf50;
+        margin: 15px 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .warning-box {
+        background-color: #fff3e0;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 8px solid #ff9800;
+        margin: 15px 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .contact-box {
+        background: linear-gradient(135deg, #ff6b6b 0%, #ff4757 100%);
+        padding: 25px;
+        border-radius: 15px;
+        color: white;
+        text-align: center;
+        margin: 20px 0;
+        box-shadow: 0 10px 20px rgba(255,75,75,0.3);
+        border: 3px solid white;
+    }
+    .contact-text {
+        font-size: 28px;
+        font-weight: bold;
+        margin: 10px 0;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    .metric-card {
+        background: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        text-align: center;
+        margin: 10px;
+        transition: transform 0.3s;
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    .metric-value {
+        font-size: 28px;
+        font-weight: bold;
+        color: #333;
+    }
+    .metric-label {
+        font-size: 16px;
+        color: #666;
+        text-transform: uppercase;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 10px;
+        height: 50px;
+        font-size: 18px;
+        font-weight: bold;
+        transition: all 0.3s;
+    }
+    .stButton>button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Language selector
+col1, col2, col3 = st.columns([3, 1, 1])
+with col2:
+    language = st.selectbox("🌐", ['English', 'Français', 'العربية'], key='language_selector')
+    st.session_state.language = language
+
+# Main header
+st.markdown(f"""
+<div class="main-header">
+    <h1 style="font-size: 48px;">{t('app_title')}</h1>
+    <p style="font-size: 20px;">{t('app_desc')}</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Contact information in red box
+st.markdown(f"""
+<div class="contact-box">
+    <h2 style="color: white; font-size: 36px; margin-bottom: 20px;">{t('contact_info')}</h2>
+    <div class="contact-text">✉️ {t('email')}: {CONTACT_EMAIL}</div>
+    <div class="contact-text">📞 {t('phone')}: {CONTACT_PHONE}</div>
+    <div class="contact-text">📠 {t('fax')}: {CONTACT_FAX}</div>
+</div>
+""", unsafe_allow_html=True)
+
+st.caption(t('note_uflp'))
+
+# Sidebar parameters
+with st.sidebar:
+    st.markdown("## ⚙️ " + t('sidebar_algo'))
+    
+    max_cycles = st.slider(t('max_cycles'), 10, 200, 50, 10)
+    k_coarse = st.slider(t('k_coarse'), 3, 20, 10)
+    patience = st.slider(t('patience'), 5, 50, 15)
+    
+    st.markdown("---")
+    st.markdown("## ⏹️ " + t('sidebar_stop'))
+    st.markdown(t('choose_criteria'))
+    
+    use_R = st.checkbox(t('use_R'), value=True)
+    if use_R:
+        R_tol = st.number_input(t('R_tol'), value=1e-4, format="%.0e", step=1e-4)
+        stable_gap_needed = st.number_input(t('stable_gap'), min_value=1, max_value=10, value=3)
+    else:
+        R_tol, stable_gap_needed = 1e-4, 3
+    
+    use_cost_repeat = st.checkbox(t('use_cost_repeat'), value=False)
+    if use_cost_repeat:
+        cost_repeat_times = st.number_input(t('cost_repeat_times'), min_value=2, max_value=20, value=5)
+    else:
+        cost_repeat_times = 5
+    
+    use_gap_repeat = st.checkbox(t('use_gap_repeat'), value=False)
+    if use_gap_repeat:
+        gap_repeat_times = st.number_input(t('gap_repeat_times'), min_value=2, max_value=20, value=5)
+    else:
+        gap_repeat_times = 5
+    
+    use_contraction = st.checkbox(t('use_contraction'), value=True)
+    if use_contraction:
+        diff_tol = st.number_input(t('diff_tol'), value=1e-8, format="%.0e", step=1e-8)
+    else:
+        diff_tol = 1e-8
+    
+    st.markdown("---")
+    st.write(f"👥 {t('workers')}: {NUM_WORKERS}")
+    
+    if os.path.exists(STATE_FILE):
+        if st.button(t('delete_state')):
+            if delete_state(STATE_FILE):
+                st.success(t('delete_state'))
+                st.rerun()
+
+# Problem type selection
+problem_type = st.radio(
+    t('select_problem_type'),
+    [t('ilp'), t('milp'), t('uflp')],
+    horizontal=True
+)
+is_uflp = (problem_type == t('uflp'))
+
+# Main tabs
+tab1, tab2 = st.tabs([t('tab_upload'), t('tab_manual')])
+
+with tab1:
+    st.markdown(f"""
+    <div class="info-box">
+        <h3>📂 {t('upload_header')}</h3>
+        <p>{t('upload_info')}</p>
+        <p><small>{t('supported_formats')}</small></p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("📄 " + t('supported_formats')):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**ILP/MILP:**\n" + t('ilp_format_help'))
+            st.markdown("**UFLP:**\n" + t('uflp_format_help'))
+        with col2:
+            st.markdown("**MPS:**\n" + t('mps_format_help'))
+            st.markdown("**KoerkelGhosh/gs250a-1:**\n" + t('koerkel_help'))
+    
+    uploaded_file = st.file_uploader(
+        t('choose_file'), 
+        type=['txt', 'uflp', 'ilp', 'mps', 'lp', 'dat', 'gms', 'mod', 'gs250a-1', 'gs250a1'],
+        help=t('supported_formats')
+    )
+    
+    if uploaded_file is not None:
+        file_details = {
+            t('file_name'): uploaded_file.name,
+            t('file_size'): f"{uploaded_file.size / 1024:.2f} KB"
+        }
+        st.json(file_details)
+        
+        if st.button(t('solve_button'), key="solve_upload"):
+            with st.spinner("🔄 " + t('solve_button')):
+                try:
+                    text = uploaded_file.getvalue().decode("utf-8", errors='ignore')
+                except:
+                    text = uploaded_file.getvalue().decode("latin-1", errors='ignore')
+                
+                try:
+                    obj, A, b, n, m, uflp_info, detected_type = flexible_file_reader(text, uploaded_file.name)
+                    
+                    # Problem info
+                    st.markdown(f"""
+                    <div class="success-box">
+                        <h4>✅ {t('problem_info')}</h4>
+                        <p><b>{t('problem_type')}:</b> {detected_type.upper()}</p>
+                        <p><b>{t('variables')}:</b> {n}</p>
+                        <p><b>{t('constraints')}:</b> {m}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Check for saved state
+                    if os.path.exists(STATE_FILE):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button(t('resume')):
+                                result = solve_ahrh(obj, A, b, uflp_info,
+                                                    max_cycles, k_coarse, patience,
+                                                    use_R, R_tol, stable_gap_needed,
+                                                    use_cost_repeat, cost_repeat_times,
+                                                    use_gap_repeat, gap_repeat_times,
+                                                    use_contraction, diff_tol,
+                                                    resume=True)
+                                st.session_state.result = result
+                                st.session_state.n = n
+                                st.session_state.m = m
+                                st.session_state.problem_type = detected_type
+                                st.rerun()
+                        with col2:
+                            if st.button(t('reset')):
+                                if os.path.exists(STATE_FILE):
+                                    os.remove(STATE_FILE)
+                                result = solve_ahrh(obj, A, b, uflp_info,
+                                                    max_cycles, k_coarse, patience,
+                                                    use_R, R_tol, stable_gap_needed,
+                                                    use_cost_repeat, cost_repeat_times,
+                                                    use_gap_repeat, gap_repeat_times,
+                                                    use_contraction, diff_tol,
+                                                    resume=False)
+                                st.session_state.result = result
+                                st.session_state.n = n
+                                st.session_state.m = m
+                                st.session_state.problem_type = detected_type
+                                st.rerun()
+                    else:
+                        result = solve_ahrh(obj, A, b, uflp_info,
+                                            max_cycles, k_coarse, patience,
+                                            use_R, R_tol, stable_gap_needed,
+                                            use_cost_repeat, cost_repeat_times,
+                                            use_gap_repeat, gap_repeat_times,
+                                            use_contraction, diff_tol,
+                                            resume=False)
+                        st.session_state.result = result
+                        st.session_state.n = n
+                        st.session_state.m = m
+                        st.session_state.problem_type = detected_type
+                        st.rerun()
+                
+                except Exception as e:
+                    st.error(f"❌ {t('error')}: {str(e)}")
+                    st.code(traceback.format_exc())
+
+with tab2:
+    st.markdown(f"""
+    <div class="warning-box">
+        <h3>✍️ {t('manual_header')}</h3>
+        <p>{t('manual_warning')}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        n_man = st.number_input(t('manual_n'), min_value=1, max_value=10, value=3, step=1, key="n_man")
+    with col2:
+        m_man = st.number_input(t('manual_m'), min_value=1, max_value=10, value=3, step=1, key="m_man")
+    
+    if is_uflp:
+        # UFLP manual input
+        st.subheader(t('manual_f'))
+        if 'f_man' not in st.session_state or len(st.session_state.f_man) != n_man:
+            st.session_state.f_man = np.ones(n_man) * 1000
+        f_vals = []
+        cols = st.columns(min(5, n_man))
+        for i in range(n_man):
+            with cols[i % 5]:
+                val = st.number_input(f"f[{i}]", value=float(st.session_state.f_man[i]), key=f"f_man_{i}")
+                f_vals.append(val)
+        st.session_state.f_man = np.array(f_vals)
+        
+        st.subheader(t('manual_costs'))
+        if 'c_man' not in st.session_state or st.session_state.c_man.shape != (n_man, m_man):
+            st.session_state.c_man = np.ones((n_man, m_man)) * 100
+        for i in range(n_man):
+            st.write(f"**الموقع {i+1}:**")
+            cols = st.columns(min(5, m_man))
+            for j in range(m_man):
+                with cols[j % 5]:
+                    val = st.number_input(f"c[{i}][{j}]", value=float(st.session_state.c_man[i, j]), key=f"c_man_{i}_{j}")
+                    st.session_state.c_man[i, j] = val
+    else:
+        # ILP/MILP manual input
+        st.subheader(t('manual_c'))
+        if 'c_man' not in st.session_state or len(st.session_state.c_man) != n_man:
+            st.session_state.c_man = np.ones(n_man)
+        c_vals = []
+        cols = st.columns(min(5, n_man))
+        for i in range(n_man):
+            with cols[i % 5]:
+                val = st.number_input(f"c[{i}]", value=float(st.session_state.c_man[i]), key=f"c_man_{i}")
+                c_vals.append(val)
+        st.session_state.c_man = np.array(c_vals)
+        
+        st.subheader(t('manual_A'))
+        if 'A_man' not in st.session_state or st.session_state.A_man.shape != (m_man, n_man):
+            st.session_state.A_man = np.ones((m_man, n_man))
+        for i in range(m_man):
+            st.write(f"**{t('constraints')} {i+1}:**")
+            cols = st.columns(min(5, n_man))
+            for j in range(n_man):
+                with cols[j % 5]:
+                    val = st.number_input(f"A[{i}][{j}]", value=float(st.session_state.A_man[i, j]), key=f"A_man_{i}_{j}")
+                    st.session_state.A_man[i, j] = val
+        
+        st.subheader(t('manual_b'))
+        if 'b_man' not in st.session_state or len(st.session_state.b_man) != m_man:
+            st.session_state.b_man = np.ones(m_man) * 10
+        b_vals = []
+        cols = st.columns(min(5, m_man))
+        for i in range(m_man):
+            with cols[i % 5]:
+                val = st.number_input(f"b[{i}]", value=float(st.session_state.b_man[i]), key=f"b_man_{i}")
+                b_vals.append(val)
+        st.session_state.b_man = np.array(b_vals)
+    
+    if st.button(t('solve_button'), key="solve_manual"):
+        with st.spinner("🔄 " + t('solve_button')):
+            try:
+                if is_uflp:
+                    f = st.session_state.f_man
+                    c = st.session_state.c_man
+                    obj, A, b, n_vars, n_constraints, n_y = uflp_to_ilp(f, c)
+                    uflp_info = {'n_y': n_y, 'f': f, 'c': c}
+                    detected_type = 'uflp'
+                else:
+                    obj = st.session_state.c_man
+                    A = st.session_state.A_man
+                    b = st.session_state.b_man
+                    uflp_info = None
+                    detected_type = 'ilp'
+                
+                if os.path.exists(STATE_FILE):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button(t('resume'), key="resume_manual"):
+                            result = solve_ahrh(obj, A, b, uflp_info,
+                                                max_cycles, k_coarse, patience,
+                                                use_R, R_tol, stable_gap_needed,
+                                                use_cost_repeat, cost_repeat_times,
+                                                use_gap_repeat, gap_repeat_times,
+                                                use_contraction, diff_tol,
+                                                resume=True)
+                            st.session_state.result = result
+                            st.session_state.n = n_man
+                            st.session_state.m = m_man
+                            st.session_state.problem_type = detected_type
+                            st.rerun()
+                    with col2:
+                        if st.button(t('reset'), key="reset_manual"):
+                            if os.path.exists(STATE_FILE):
+                                os.remove(STATE_FILE)
+                            result = solve_ahrh(obj, A, b, uflp_info,
+                                                max_cycles, k_coarse, patience,
+                                                use_R, R_tol, stable_gap_needed,
+                                                use_cost_repeat, cost_repeat_times,
+                                                use_gap_repeat, gap_repeat_times,
+                                                use_contraction, diff_tol,
+                                                resume=False)
+                            st.session_state.result = result
+                            st.session_state.n = n_man
+                            st.session_state.m = m_man
+                            st.session_state.problem_type = detected_type
+                            st.rerun()
+                else:
+                    result = solve_ahrh(obj, A, b, uflp_info,
+                                        max_cycles, k_coarse, patience,
+                                        use_R, R_tol, stable_gap_needed,
+                                        use_cost_repeat, cost_repeat_times,
+                                        use_gap_repeat, gap_repeat_times,
+                                        use_contraction, diff_tol,
+                                        resume=False)
+                    st.session_state.result = result
+                    st.session_state.n = n_man
+                    st.session_state.m = m_man
+                    st.session_state.problem_type = detected_type
+                    st.rerun()
+            
+            except Exception as e:
+                st.error(f"❌ {t('error')}: {str(e)}")
+                st.code(traceback.format_exc())
+
+# ------------------- Results Display -------------------
+st.markdown("---")
+
+if st.session_state.get('result') is not None:
+    res = st.session_state.result
+    
+    st.markdown(f"""
+    <div class="success-box">
+        <h2>📊 {t('results')}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Metrics in cards
+    colA, colB, colC, colD = st.columns(4)
+    with colA:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{res['best_cost']:,.2f}</div>
+            <div class="metric-label">{t('best_cost')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with colB:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{res['lp_val']:,.2f}</div>
+            <div class="metric-label">{t('lp_val')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with colC:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{res['gap']:.4f}%</div>
+            <div class="metric-label">{t('gap')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with colD:
+        if res.get('open_fac') is not None:
+            val = res['open_fac']
+            label = t('open_fac')
+        else:
+            val = f"{st.session_state.get('n', 0)}×{st.session_state.get('m', 0)}"
+            label = t('size')
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{val}</div>
+            <div class="metric-label">{label}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    colE, colF, colG = st.columns(3)
+    with colE:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{res['cycles_done']}</div>
+            <div class="metric-label">{t('cycles_done')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with colF:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{res['total_time']:.2f}s</div>
+            <div class="metric-label">{t('time')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with colG:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{res['stop_reason']}</div>
+            <div class="metric-label">{t('stop_reason')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    if res.get('acceleration_active'):
+        st.success(f"⚡ {t('acceleration_on')}")
+    
+    # Plots
+    if res['gap_history']:
+        st.subheader(t('gap_plot'))
+        
+        plot_tab1, plot_tab2, plot_tab3 = st.tabs([t('gap_by_cycles'), t('gap_by_R'), t('convergence_plot')])
+        
+        with plot_tab1:
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+            cycles = list(range(1, len(res['gap_history'])+1))
+            
+            # Gap vs Cycles with shaded area
+            ax1.plot(cycles, res['gap_history'], 'b-', linewidth=2, label=t('gap_label'))
+            ax1.fill_between(cycles, 0, res['gap_history'], alpha=0.3, color='blue')
+            ax1.set_xlabel(t('cycle'))
+            ax1.set_ylabel(t('gap_label'))
+            ax1.set_title(t('cycles_vs_gap'))
+            ax1.grid(True, alpha=0.3)
+            ax1.legend()
+            
+            # R vs Cycles with shaded area
+            ax2.plot(cycles, res['R_history'], 'r-', linewidth=2, label=t('R_label'))
+            ax2.fill_between(cycles, 0, res['R_history'], alpha=0.3, color='red')
+            ax2.set_xlabel(t('cycle'))
+            ax2.set_ylabel(t('R_label'))
+            ax2.set_title(f'R {t("vs")} {t("cycle")}')
+            ax2.grid(True, alpha=0.3)
+            ax2.legend()
+            
+            plt.tight_layout()
+            st.pyplot(fig)
+        
+        with plot_tab2:
+            fig, ax = plt.subplots(figsize=(12, 6))
+            
+            # Gap vs R scatter with color gradient
+            scatter = ax.scatter(res['R_history'], res['gap_history'], 
+                               c=cycles, cmap='viridis', s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
+            ax.set_xlabel(t('R_label'))
+            ax.set_ylabel(t('gap_label'))
+            ax.set_title(t('R_vs_gap'))
+            ax.grid(True, alpha=0.3)
+            plt.colorbar(scatter, ax=ax, label=t('cycle'))
+            
+            # Trend line
+            if len(res['R_history']) > 1:
+                z = np.polyfit(res['R_history'], res['gap_history'], 1)
+                p = np.poly1d(z)
+                ax.plot(res['R_history'], p(res['R_history']), "r--", alpha=0.8, linewidth=2, label='Trend')
+                ax.legend()
+            
+            plt.tight_layout()
+            st.pyplot(fig)
+        
+        with plot_tab3:
+            fig, ax = plt.subplots(figsize=(12, 6))
+            
+            # Convergence plot with log scale
+            ax.semilogy(cycles, res['gap_history'], 'b-', linewidth=2, label=t('gap_label'))
+            ax.semilogy(cycles, res['R_history'], 'r-', linewidth=2, label=t('R_label'))
+            ax.set_xlabel(t('cycle'))
+            ax.set_ylabel('Value (log scale)')
+            ax.set_title(t('convergence_plot'))
+            ax.grid(True, alpha=0.3, which='both')
+            ax.legend()
+            
+            plt.tight_layout()
+            st.pyplot(fig)
+        
+        # Cycle log
+        st.subheader(t('cycle_log'))
+        df_cycles = pd.DataFrame(res['cycles_log'])
+        df_cycles = df_cycles.rename(columns={
+            'cycle': t('cycle'),
+            'cost': t('cost'),
+            'gap': t('gap'),
+            'R': 'R',
+            'diff': 'Diff',
+            'improved': t('improved'),
+            'best_so_far': t('best_so_far')
+        })
+        df_cycles[t('improved')] = df_cycles[t('improved')].apply(lambda x: t('yes') if x else t('no'))
+        st.dataframe(df_cycles, use_container_width=True)
+        
+        # Download
+        df = pd.DataFrame({
+            t('cycle'): cycles,
+            t('gap_label'): res['gap_history'],
+            'R': res['R_history']
+        })
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label=t('download'),
+            data=csv,
+            file_name=f"ahrh_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+else:
+    st.markdown(f"""
+    <div class="info-box">
+        <h3>👈 {t('info_placeholder')}</h3>
+        <p>{t('supported_formats')}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# Footer
+st.markdown("---")
+st.markdown(f"""
+<div style="text-align: center; color: #666; padding: 20px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 15px;">
+    <p style="font-size: 18px;">{t('footer')}</p>
+    <p style="font-size: 16px;">🔬 AHRH Algorithm - Patented Technology | 📧 {CONTACT_EMAIL} | 📞 {CONTACT_PHONE}</p>
+    <p style="font-size: 14px;">© 2024 Zakarya Benregreg. All rights reserved.</p>
+</div>
+""", unsafe_allow_html=True)
+```
+
+هذا البرنامج النهائي يجمع كل الميزات المطلوبة:
+
+1. ✅ **اللوحة الحمراء** لمعلومات الاتصال (في أعلى الصفحة)
+2. ✅ **العنوان الكبير** مع تدرج لوني
+3. ✅ **دعم جميع صيغ الملفات** (ILP, MILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1)
+4. ✅ **الكشف التلقائي** عن نوع الملف
+5. ✅ **اللوحة الحمراء للتقدم** أثناء الحل (مع تفاصيل ملونة)
+6. ✅ **ثلاثة أنواع من الرسوم البيانية**
+7. ✅ **إيقاف مؤقت واستئناف**
+8. ✅ **حفظ واستعادة الحالة**
+9. ✅ **ثلاث لغات** (عربي/إنجليزي/فرنسي)
+10. ✅ **معايير توقف متعددة**
+11. ✅ **وضع التسريع التلقائي**
+12. ✅ **بطاقات عرض النتائج** مع تأثيرات حركية
