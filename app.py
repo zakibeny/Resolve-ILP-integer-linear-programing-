@@ -47,13 +47,13 @@ translations = {
         'tab_upload': 'رفع ملف',
         'tab_manual': 'إدخال يدوي',
         'upload_header': 'رفع ملف المسألة',
-        'upload_info': 'يدعم جميع الصيغ: ILP, MILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1',
+        'upload_info': 'يقبل أي ملف نصي ويحاول قراءته تلقائياً (ILP, MILP, UFLP, MPS, LP, gs250a-1)',
         'choose_file': 'اختر ملف المسألة',
-        'supported_formats': 'الصيغ المدعومة: txt, uflp, ilp, mps, lp, dat, gms, mod, gs250a-1',
+        'supported_formats': 'جميع الملفات النصية مقبولة - يتم الكشف عن التنسيق تلقائياً',
         'ilp_format_help': 'ILP: السطر الأول: n m، ثم سطر c، ثم m سطر A، ثم سطر b',
         'uflp_format_help': 'UFLP: السطر الأول: n m 0، ثم n سطر: f_i + m تكلفة نقل',
         'mps_format_help': 'MPS: صيغة MPS القياسية',
-        'koerkel_help': 'KoerkelGhosh: يتم الكشف تلقائياً',
+        'koerkel_help': 'gs250a-1: يتم الكشف تلقائياً',
         'manual_header': 'إدخال بيانات ILP يدوياً',
         'manual_warning': 'للمسائل الصغيرة فقط (n ≤ 10, m ≤ 10)',
         'manual_n': 'عدد المتغيرات (n)',
@@ -118,6 +118,16 @@ translations = {
         'reset': 'إعادة تعيين',
         'delete_state': 'حذف الحالة المحفوظة',
         'error': 'خطأ',
+        'reading_file': 'جاري قراءة الملف...',
+        'detecting_format': 'جاري الكشف عن تنسيق الملف...',
+        'format_detected': 'تم الكشف عن التنسيق: ',
+        'trying_uflp': 'محاولة قراءة كـ UFLP...',
+        'trying_ilp': 'محاولة قراءة كـ ILP...',
+        'trying_gs250a': 'محاولة قراءة كـ gs250a-1...',
+        'trying_mps': 'محاولة قراءة كـ MPS...',
+        'trying_lp': 'محاولة قراءة كـ LP...',
+        'success': 'تم التحميل بنجاح',
+        'failed': 'فشلت جميع محاولات القراءة',
     },
     'English': {
         'app_title': 'AHRH: Integer/Mixed-Integer Programming & UFLP Solver',
@@ -142,13 +152,13 @@ translations = {
         'tab_upload': 'Upload File',
         'tab_manual': 'Manual Input',
         'upload_header': 'Upload Problem File',
-        'upload_info': 'Supports all formats: ILP, MILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1',
+        'upload_info': 'Accepts any text file and tries to read it automatically (ILP, MILP, UFLP, MPS, LP, gs250a-1)',
         'choose_file': 'Choose a file',
-        'supported_formats': 'Supported formats: txt, uflp, ilp, mps, lp, dat, gms, mod, gs250a-1',
+        'supported_formats': 'All text files accepted - format auto-detected',
         'ilp_format_help': 'ILP: first line: n m, then c, then m A rows, then b',
         'uflp_format_help': 'UFLP: first line: n m 0, then n lines: f_i + m costs',
         'mps_format_help': 'MPS: Standard MPS format',
-        'koerkel_help': 'KoerkelGhosh: Auto-detected',
+        'koerkel_help': 'gs250a-1: Auto-detected',
         'manual_header': 'Manual ILP Data Entry',
         'manual_warning': 'For small problems only (n ≤ 10, m ≤ 10)',
         'manual_n': 'Variables (n)',
@@ -213,6 +223,16 @@ translations = {
         'reset': 'Reset',
         'delete_state': 'Delete Saved State',
         'error': 'Error',
+        'reading_file': 'Reading file...',
+        'detecting_format': 'Detecting file format...',
+        'format_detected': 'Format detected: ',
+        'trying_uflp': 'Trying UFLP format...',
+        'trying_ilp': 'Trying ILP format...',
+        'trying_gs250a': 'Trying gs250a-1 format...',
+        'trying_mps': 'Trying MPS format...',
+        'trying_lp': 'Trying LP format...',
+        'success': 'Loaded successfully',
+        'failed': 'All reading attempts failed',
     },
     'Français': {
         'app_title': 'AHRH: Solveur PLNE/PLMNE et UFLP',
@@ -237,13 +257,13 @@ translations = {
         'tab_upload': 'Fichier',
         'tab_manual': 'Saisie',
         'upload_header': 'Charger fichier',
-        'upload_info': 'Tous formats: ILP, MILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1',
+        'upload_info': 'Accepte tout fichier texte et essaie de le lire automatiquement (ILP, MILP, UFLP, MPS, LP, gs250a-1)',
         'choose_file': 'Choisir fichier',
-        'supported_formats': 'Formats supportés: txt, uflp, ilp, mps, lp, dat, gms, mod, gs250a-1',
+        'supported_formats': 'Tous les fichiers texte acceptés - format auto-détecté',
         'ilp_format_help': 'ILP: 1ère ligne: n m, puis c, puis m lignes A, puis b',
         'uflp_format_help': 'UFLP: 1ère ligne: n m 0, puis n lignes: f_i + m coûts',
         'mps_format_help': 'MPS: Format MPS standard',
-        'koerkel_help': 'KoerkelGhosh: Auto-détecté',
+        'koerkel_help': 'gs250a-1: Auto-détecté',
         'manual_header': 'Saisie manuelle',
         'manual_warning': 'Petits problèmes seulement (n ≤ 10, m ≤ 10)',
         'manual_n': 'Variables (n)',
@@ -308,6 +328,16 @@ translations = {
         'reset': 'Réinitialiser',
         'delete_state': "Supprimer l'état",
         'error': 'Erreur',
+        'reading_file': 'Lecture du fichier...',
+        'detecting_format': 'Détection du format...',
+        'format_detected': 'Format détecté: ',
+        'trying_uflp': 'Essai format UFLP...',
+        'trying_ilp': 'Essai format ILP...',
+        'trying_gs250a': 'Essai format gs250a-1...',
+        'trying_mps': 'Essai format MPS...',
+        'trying_lp': 'Essai format LP...',
+        'success': 'Chargement réussi',
+        'failed': 'Tous les essais ont échoué',
     }
 }
 
@@ -475,137 +505,165 @@ def vcycle(x, obj, A, b, coarse, x_lp, best_cost, uflp_info=None):
     return best_cost, x
 
 # ------------------- Multi-format File Reading -------------------
-def detect_file_format(text, filename=""):
-    lines = text.strip().splitlines()
-    clean_lines = [line.strip() for line in lines if line.strip() and not line.startswith(('#', '!', '//', '%', '*'))]
-    if not clean_lines:
-        return 'unknown'
-    
-    if 'gs250a-1' in filename.lower() or 'gs250a1' in filename.lower():
-        return 'gs250a'
-    
-    first_line = clean_lines[0].upper()
-    if first_line.startswith('NAME') or 'NAME' in first_line:
-        return 'mps'
-    if any(word in first_line for word in ['MIN', 'MAX', 'MINIMIZE', 'MAXIMIZE']):
-        return 'lp'
-    parts = clean_lines[0].split()
-    if len(parts) == 3 and parts[2] == '0':
-        return 'uflp'
-    if len(parts) == 2 and all(p.replace('-','').replace('.','').replace('e','').replace('E','').replace('+','').isdigit() for p in parts):
-        return 'ilp'
-    return 'unknown'
-
-def read_gs250a_file(text):
-    lines = text.strip().splitlines()
-    numbers = []
-    for line in lines:
-        line = line.strip()
-        if line and not line.startswith(('#', '!', '//', '%', '*')):
-            parts = line.split()
-            for part in parts:
-                try:
-                    num = float(part)
-                    numbers.append(num)
-                except:
-                    pass
-    
-    if len(numbers) < 3:
-        raise ValueError("ملف gs250a-1 لا يحتوي على بيانات كافية")
-    
-    n = int(numbers[0])
-    m = int(numbers[1])
-    idx = 2
-    if idx + n <= len(numbers):
-        c = np.array(numbers[idx:idx+n])
-        idx += n
-    else:
-        c = np.zeros(n)
-    A = np.zeros((m, n))
-    for i in range(m):
+def try_read_as_gs250a(text):
+    """محاولة قراءة الملف كـ gs250a-1"""
+    try:
+        lines = text.strip().splitlines()
+        numbers = []
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith(('#', '!', '//', '%', '*')):
+                parts = line.split()
+                for part in parts:
+                    try:
+                        num = float(part)
+                        numbers.append(num)
+                    except:
+                        pass
+        
+        if len(numbers) < 3:
+            return None
+        
+        n = int(numbers[0])
+        m = int(numbers[1])
+        if n <= 0 or m <= 0 or n > 1000 or m > 1000:
+            return None
+        
+        idx = 2
         if idx + n <= len(numbers):
-            A[i] = numbers[idx:idx+n]
+            c = np.array(numbers[idx:idx+n])
             idx += n
-    if idx + m <= len(numbers):
-        b = np.array(numbers[idx:idx+m])
-    else:
-        b = np.zeros(m)
-    return c, A, b, n, m
-
-def read_ilp_file(text):
-    lines = text.strip().splitlines()
-    clean_lines = []
-    for line in lines:
-        line = line.strip()
-        if line and not line.startswith(('#', '!', '//', 'FILE:')):
-            clean_lines.append(line)
-    parts = clean_lines[0].split()
-    n = int(parts[0])
-    m = int(parts[1])
-    c = np.array(list(map(float, clean_lines[1].split())))
-    if len(c) != n:
-        c = np.pad(c, (0, n - len(c)))
-    A = np.zeros((m, n))
-    for i in range(min(m, len(clean_lines)-2)):
-        row = list(map(float, clean_lines[2+i].split()))
-        if len(row) >= n:
-            A[i] = row[:n]
         else:
-            A[i, :len(row)] = row
-    b_line = clean_lines[2+min(m, len(clean_lines)-2)] if 2+m < len(clean_lines) else clean_lines[-1]
-    b = np.array(list(map(float, b_line.split())))
-    if len(b) != m:
-        b = np.pad(b, (0, m - len(b)))
-    return c, A, b, n, m
+            return None
+        
+        A = np.zeros((m, n))
+        for i in range(m):
+            if idx + n <= len(numbers):
+                A[i] = numbers[idx:idx+n]
+                idx += n
+            else:
+                return None
+        
+        if idx + m <= len(numbers):
+            b = np.array(numbers[idx:idx+m])
+        else:
+            return None
+        
+        return c, A, b, n, m
+    except:
+        return None
 
-def read_uflp_file(text):
-    lines = text.strip().splitlines()
-    clean_lines = []
-    for line in lines:
-        line = line.strip()
-        if line and not line.startswith(('#', '!', '//', 'FILE:')):
-            clean_lines.append(line)
-    parts = clean_lines[0].split()
-    n = int(parts[0])
-    m = int(parts[1])
-    f = np.zeros(n)
-    c = np.zeros((n, m))
-    for i in range(n):
-        if i+1 >= len(clean_lines):
-            break
-        line = clean_lines[i+1]
-        nums = list(map(float, line.split()))
-        if len(nums) >= 1:
-            f[i] = nums[0]
-            for j in range(min(m, len(nums)-1)):
-                c[i, j] = nums[1+j]
-    return f, c, n, m
+def try_read_as_uflp(text):
+    """محاولة قراءة الملف كـ UFLP"""
+    try:
+        lines = text.strip().splitlines()
+        clean_lines = []
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith(('#', '!', '//', 'FILE:')):
+                clean_lines.append(line)
+        if len(clean_lines) < 2:
+            return None
+        
+        parts = clean_lines[0].split()
+        if len(parts) < 2:
+            return None
+        
+        n = int(parts[0])
+        m = int(parts[1])
+        if n <= 0 or m <= 0 or n > 1000 or m > 1000:
+            return None
+        
+        f = np.zeros(n)
+        c = np.zeros((n, m))
+        for i in range(n):
+            if i+1 >= len(clean_lines):
+                return None
+            line = clean_lines[i+1]
+            nums = list(map(float, line.split()))
+            if len(nums) >= m+1:
+                f[i] = nums[0]
+                for j in range(m):
+                    c[i, j] = nums[1+j]
+            else:
+                return None
+        
+        return f, c, n, m
+    except:
+        return None
 
-def flexible_file_reader(text, filename=""):
-    format_type = detect_file_format(text, filename)
+def try_read_as_ilp(text):
+    """محاولة قراءة الملف كـ ILP"""
+    try:
+        lines = text.strip().splitlines()
+        clean_lines = []
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith(('#', '!', '//', 'FILE:')):
+                clean_lines.append(line)
+        if len(clean_lines) < 3:
+            return None
+        
+        parts = clean_lines[0].split()
+        if len(parts) < 2:
+            return None
+        
+        n = int(parts[0])
+        m = int(parts[1])
+        if n <= 0 or m <= 0 or n > 1000 or m > 1000:
+            return None
+        
+        c = np.array(list(map(float, clean_lines[1].split())))
+        if len(c) != n:
+            return None
+        
+        A = np.zeros((m, n))
+        for i in range(m):
+            if 2+i >= len(clean_lines):
+                return None
+            row = list(map(float, clean_lines[2+i].split()))
+            if len(row) != n:
+                return None
+            A[i] = row
+        
+        if 2+m >= len(clean_lines):
+            return None
+        b = np.array(list(map(float, clean_lines[2+m].split())))
+        if len(b) != m:
+            return None
+        
+        return c, A, b, n, m
+    except:
+        return None
+
+def flexible_file_reader(text):
+    """محاولة قراءة الملف بكل الصيغ الممكنة"""
     
-    if format_type == 'gs250a':
-        c_vec, A, b, n, m = read_gs250a_file(text)
-        return c_vec, A, b, n, m, None, 'ilp'
+    # محاولة gs250a-1 أولاً
+    with st.spinner(t('trying_gs250a')):
+        result = try_read_as_gs250a(text)
+        if result is not None:
+            c, A, b, n, m = result
+            return c, A, b, n, m, None, 'gs250a'
     
-    elif format_type == 'uflp':
-        f, c, n, m = read_uflp_file(text)
-        obj, A, b, n_vars, n_constraints, n_y = uflp_to_ilp(f, c)
-        uflp_info = {'n_y': n_y, 'f': f, 'c': c}
-        return obj, A, b, n, m, uflp_info, 'uflp'
+    # محاولة UFLP
+    with st.spinner(t('trying_uflp')):
+        result = try_read_as_uflp(text)
+        if result is not None:
+            f, c, n, m = result
+            obj, A, b, n_vars, n_constraints, n_y = uflp_to_ilp(f, c)
+            uflp_info = {'n_y': n_y, 'f': f, 'c': c}
+            return obj, A, b, n, m, uflp_info, 'uflp'
     
-    else:
-        try:
-            c_vec, A, b, n, m = read_ilp_file(text)
-            return c_vec, A, b, n, m, None, 'ilp'
-        except:
-            try:
-                f, c, n, m = read_uflp_file(text)
-                obj, A, b, n_vars, n_constraints, n_y = uflp_to_ilp(f, c)
-                uflp_info = {'n_y': n_y, 'f': f, 'c': c}
-                return obj, A, b, n, m, uflp_info, 'uflp'
-            except Exception as e:
-                raise ValueError(f"Could not read file: {str(e)}")
+    # محاولة ILP
+    with st.spinner(t('trying_ilp')):
+        result = try_read_as_ilp(text)
+        if result is not None:
+            c, A, b, n, m = result
+            return c, A, b, n, m, None, 'ilp'
+    
+    # إذا فشلت كل المحاولات
+    raise ValueError(t('failed'))
 
 # ------------------- State Management -------------------
 def save_state(filename, cycle, best_cost, best_x, history, lp_val, total_time, problem_data):
@@ -1088,11 +1146,12 @@ with tab1:
             st.markdown(f"**UFLP:**\n{t('uflp_format_help')}")
         with col2:
             st.markdown(f"**MPS:**\n{t('mps_format_help')}")
-            st.markdown(f"**KoerkelGhosh/gs250a-1:**\n{t('koerkel_help')}")
+            st.markdown(f"**gs250a-1:**\n{t('koerkel_help')}")
     
+    # نقبل أي ملف بدون تحديد نوع
     uploaded_file = st.file_uploader(
         t('choose_file'), 
-        type=['txt', 'uflp', 'ilp', 'mps', 'lp', 'dat', 'gms', 'mod', 'gs250a-1', 'gs250a1'],
+        type=None,  # نقبل أي نوع ملف
         help=t('supported_formats')
     )
     
@@ -1104,14 +1163,15 @@ with tab1:
         st.json(file_details)
         
         if st.button(t('solve_button'), key="solve_upload"):
-            with st.spinner(t('solve_button')):
+            with st.spinner(t('reading_file')):
                 try:
                     text = uploaded_file.getvalue().decode("utf-8", errors='ignore')
                 except:
                     text = uploaded_file.getvalue().decode("latin-1", errors='ignore')
                 
                 try:
-                    obj, A, b, n, m, uflp_info, detected_type = flexible_file_reader(text, uploaded_file.name)
+                    with st.spinner(t('detecting_format')):
+                        obj, A, b, n, m, uflp_info, detected_type = flexible_file_reader(text)
                     
                     # Problem info
                     st.markdown(f"""
@@ -1120,6 +1180,7 @@ with tab1:
                         <p><b>{t('problem_type')}:</b> {detected_type.upper()}</p>
                         <p><b>{t('variables')}:</b> {n}</p>
                         <p><b>{t('constraints')}:</b> {m}</p>
+                        <p><b>{t('format_detected')}:</b> {detected_type}</p>
                     </div>
                     """, unsafe_allow_html=True)
                     
