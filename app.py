@@ -1,8 +1,8 @@
-```python
 # -*- coding: utf-8 -*-
 """
 AHRH Integer Programming Solver Application
 """
+
 import streamlit as st
 import numpy as np
 import pulp
@@ -94,6 +94,7 @@ translations = {
         'convergence_plot': 'مخطط التقارب',
         'cycles_vs_gap': 'عدد الدورات مقابل الفجوة',
         'R_vs_gap': 'R مقابل الفجوة',
+        'vs': 'مقابل',
     },
     'English': {
         'app_title': '🧠 AHRH: Integer Programming Solver',
@@ -167,6 +168,7 @@ translations = {
         'convergence_plot': 'Convergence Plot',
         'cycles_vs_gap': 'Cycles vs Gap',
         'R_vs_gap': 'R vs Gap',
+        'vs': 'vs',
     },
     'Français': {
         'app_title': '🧠 AHRH: Solveur de programmation en nombres entiers',
@@ -240,6 +242,7 @@ translations = {
         'convergence_plot': 'Graphique de convergence',
         'cycles_vs_gap': 'Cycles vs Écart',
         'R_vs_gap': 'R vs Écart',
+        'vs': 'vs',
     }
 }
 
@@ -1144,4 +1147,3 @@ st.caption(t('footer'))
 if os.path.exists(STATE_FILE) and 'result' in st.session_state:
     # Optionally keep state file for resuming later
     pass
-```
