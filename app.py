@@ -697,4 +697,4 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
 
     if resume and len(history) > 0:
         cycles_log = history
-        gap_history = [h['gap']
+        gap_history = [h['gap']]
