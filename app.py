@@ -1,6 +1,3 @@
-"""
-AHRH solver for ILP and UFLP problems with advanced features.
-"""
 import streamlit as st
 import numpy as np
 import pulp
@@ -1825,4 +1822,3 @@ else:
 
 st.markdown("---")
 st.caption(t('footer'))
-```
