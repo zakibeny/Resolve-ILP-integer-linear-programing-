@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-AHRH Integer Programming Solver Application
-حل مسائل البرمجة الصحيحة (ILP) والبرمجة الصحيحة المختلطة (MILP)
+AHRH: حل مسائل البرمجة الصحيحة (ILP/MILP) ومسائل مواقع المرافق (UFLP)
+مع واجهة متعددة اللغات، عرض التقدم، معايير توقف متعددة، وحفظ الحالة
 """
 
 import streamlit as st
@@ -15,19 +15,19 @@ import os
 import traceback
 import warnings
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 warnings.filterwarnings("ignore")
 
-# ------------------- Configuration -------------------
+# ------------------- إعدادات -------------------
 NUM_WORKERS = 4
 STATE_FILE = "ahrh_state.json"
-ALLOWED_EXTENSIONS = ['txt', 'uflp', 'ilp', 'mps', 'lp', 'dat', 'gms', 'mod', 'gs250a-1', 'gs250a1']
 
-# ------------------- Translations -------------------
+# ------------------- ترجمة النصوص -------------------
 translations = {
     'العربية': {
-        'app_title': '🧠 AHRH: حلول البرمجة الصحيحة (ILP/MILP)',
-        'app_desc': 'تطبيق لحل مسائل البرمجة الصحيحة (ILP) والبرمجة الصحيحة المختلطة (MILP) باستخدام خوارزمية AHRH.',
-        'note_uflp': 'ملاحظة: يمكن رفع ملفات UFLP، ويتم تحويلها تلقائياً إلى ILP.',
+        'app_title': '🧠 AHRH: حلول البرمجة الصحيحة (ILP/MILP) و UFLP',
+        'app_desc': 'تطبيق لحل مسائل البرمجة الصحيحة (ILP) والبرمجة الصحيحة المختلطة (MILP) ومسائل مواقع المرافق (UFLP) باستخدام خوارزمية AHRH.',
+        'note_uflp': 'ملاحظة: يتم تحويل مسائل UFLP تلقائياً إلى ILP.',
         'sidebar_algo': '⚙️ معاملات الخوارزمية',
         'max_cycles': 'عدد الدورات الأقصى',
         'k_coarse': 'حجم المجموعة الخشنة (k)',
@@ -47,7 +47,7 @@ translations = {
         'tab_upload': '📂 رفع ملف',
         'tab_manual': '✍️ إدخال يدوي',
         'upload_header': 'رفع ملف المسألة',
-        'upload_info': 'يدعم جميع الصيغ: ILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1',
+        'upload_info': 'يدعم جميع الصيغ: ILP, MILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1',
         'choose_file': 'اختر ملف المسألة',
         'supported_formats': 'الصيغ المدعومة: txt, uflp, ilp, mps, lp, dat, gms, mod, gs250a-1',
         'ilp_format_help': 'ILP: السطر الأول: n m، ثم سطر c، ثم m سطر A، ثم سطر b',
@@ -61,9 +61,10 @@ translations = {
         'manual_c': 'معاملات الهدف c[i]',
         'manual_A': 'مصفوفة القيود A[i][j]',
         'manual_b': 'الطرف الأيمن b[i]',
+        'manual_f': 'تكاليف الفتح f[i]',
+        'manual_costs': 'تكاليف النقل c[i][j]',
         'solve_button': '🚀 حل المسألة',
         'results': '📊 النتائج',
-        'problem_info': 'ℹ️ معلومات المسألة',
         'best_cost': 'أفضل تكلفة',
         'lp_val': 'قيمة LP',
         'gap': 'الفجوة (%)',
@@ -71,7 +72,6 @@ translations = {
         'cycles_done': 'عدد الدورات',
         'time': 'الزمن (ث)',
         'size': 'الحجم',
-        'var_type': 'نوع المتغيرات',
         'stop_reason': 'سبب التوقف',
         'gap_plot': '📈 تطور الفجوة و R',
         'gap_label': 'الفجوة',
@@ -106,16 +106,22 @@ translations = {
         'file_size': 'حجم الملف',
         'variables': 'المتغيرات',
         'constraints': 'القيود',
-        'binary_vars': 'متغيرات ثنائية',
-        'integer_vars': 'متغيرات صحيحة',
-        'continuous_vars': 'متغيرات مستمرة',
+        'problem_type': 'نوع المسألة',
+        'ilp': 'برمجة صحيحة (ILP)',
+        'milp': 'برمجة صحيحة مختلطة (MILP)',
+        'uflp': 'مسألة مواقع المرافق (UFLP)',
+        'select_problem_type': 'اختر نوع المسألة',
+        'contact_info': '📞 معلومات الاتصال',
+        'email': 'البريد الإلكتروني',
+        'phone': 'الهاتف',
+        'fax': 'فاكس',
         'reset': '🔄 إعادة تعيين',
         'delete_state': '🗑️ حذف الحالة المحفوظة',
     },
     'English': {
-        'app_title': '🧠 AHRH: Integer/Mixed-Integer Programming Solver',
-        'app_desc': 'Solve ILP and MILP problems using the patented AHRH algorithm.',
-        'note_uflp': 'Note: UFLP files are automatically converted to ILP.',
+        'app_title': '🧠 AHRH: Integer/Mixed-Integer Programming & UFLP Solver',
+        'app_desc': 'Solve ILP, MILP, and UFLP problems using the patented AHRH algorithm.',
+        'note_uflp': 'Note: UFLP problems are automatically converted to ILP.',
         'sidebar_algo': '⚙️ Algorithm Parameters',
         'max_cycles': 'Max Cycles',
         'k_coarse': 'Coarse Set Size (k)',
@@ -135,7 +141,7 @@ translations = {
         'tab_upload': '📂 Upload File',
         'tab_manual': '✍️ Manual Input',
         'upload_header': 'Upload Problem File',
-        'upload_info': 'Supports all formats: ILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1',
+        'upload_info': 'Supports all formats: ILP, MILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1',
         'choose_file': 'Choose a file',
         'supported_formats': 'Supported formats: txt, uflp, ilp, mps, lp, dat, gms, mod, gs250a-1',
         'ilp_format_help': 'ILP: first line: n m, then c, then m A rows, then b',
@@ -149,9 +155,10 @@ translations = {
         'manual_c': 'Objective coefficients c[i]',
         'manual_A': 'Constraint matrix A[i][j]',
         'manual_b': 'Right-hand side b[i]',
+        'manual_f': 'Opening costs f[i]',
+        'manual_costs': 'Transport costs c[i][j]',
         'solve_button': '🚀 Solve Problem',
         'results': '📊 Results',
-        'problem_info': 'ℹ️ Problem Information',
         'best_cost': 'Best Cost',
         'lp_val': 'LP Value',
         'gap': 'Gap (%)',
@@ -159,7 +166,6 @@ translations = {
         'cycles_done': 'Cycles Done',
         'time': 'Time (s)',
         'size': 'Size',
-        'var_type': 'Variable Types',
         'stop_reason': 'Stop Reason',
         'gap_plot': '📈 Gap & R Evolution',
         'gap_label': 'Gap',
@@ -194,16 +200,22 @@ translations = {
         'file_size': 'File Size',
         'variables': 'Variables',
         'constraints': 'Constraints',
-        'binary_vars': 'Binary Variables',
-        'integer_vars': 'Integer Variables',
-        'continuous_vars': 'Continuous Variables',
+        'problem_type': 'Problem Type',
+        'ilp': 'Integer Programming (ILP)',
+        'milp': 'Mixed-Integer Programming (MILP)',
+        'uflp': 'Facility Location (UFLP)',
+        'select_problem_type': 'Select Problem Type',
+        'contact_info': '📞 Contact Information',
+        'email': 'Email',
+        'phone': 'Phone',
+        'fax': 'Fax',
         'reset': '🔄 Reset',
         'delete_state': '🗑️ Delete Saved State',
     },
     'Français': {
-        'app_title': '🧠 AHRH: Solveur PLNE/PLMNE',
-        'app_desc': 'Résoudre des problèmes PLNE et PLMNE avec l\'algorithme AHRH breveté.',
-        'note_uflp': 'Note: Les fichiers UFLP sont convertis automatiquement.',
+        'app_title': '🧠 AHRH: Solveur PLNE/PLMNE et UFLP',
+        'app_desc': 'Résoudre des problèmes PLNE, PLMNE et UFLP avec l\'algorithme AHRH breveté.',
+        'note_uflp': 'Note: Les problèmes UFLP sont convertis automatiquement en PLNE.',
         'sidebar_algo': '⚙️ Paramètres',
         'max_cycles': 'Cycles max',
         'k_coarse': 'Taille ensemble grossier (k)',
@@ -223,7 +235,7 @@ translations = {
         'tab_upload': '📂 Fichier',
         'tab_manual': '✍️ Saisie',
         'upload_header': 'Charger fichier',
-        'upload_info': 'Tous formats: ILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1',
+        'upload_info': 'Tous formats: ILP, MILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1',
         'choose_file': 'Choisir fichier',
         'supported_formats': 'Formats supportés: txt, uflp, ilp, mps, lp, dat, gms, mod, gs250a-1',
         'ilp_format_help': 'ILP: 1ère ligne: n m, puis c, puis m lignes A, puis b',
@@ -237,9 +249,10 @@ translations = {
         'manual_c': 'Coefficients c[i]',
         'manual_A': 'Matrice A[i][j]',
         'manual_b': 'Second membre b[i]',
+        'manual_f': 'Coûts ouverture f[i]',
+        'manual_costs': 'Coûts transport c[i][j]',
         'solve_button': '🚀 Résoudre',
         'results': '📊 Résultats',
-        'problem_info': 'ℹ️ Information',
         'best_cost': 'Meilleur coût',
         'lp_val': 'Valeur LP',
         'gap': 'Écart (%)',
@@ -247,7 +260,6 @@ translations = {
         'cycles_done': 'Cycles',
         'time': 'Temps (s)',
         'size': 'Taille',
-        'var_type': 'Types variables',
         'stop_reason': 'Raison arrêt',
         'gap_plot': '📈 Évolution',
         'gap_label': 'Écart',
@@ -282,9 +294,15 @@ translations = {
         'file_size': 'Taille',
         'variables': 'Variables',
         'constraints': 'Contraintes',
-        'binary_vars': 'Variables binaires',
-        'integer_vars': 'Variables entières',
-        'continuous_vars': 'Variables continues',
+        'problem_type': 'Type problème',
+        'ilp': 'PLNE',
+        'milp': 'PLMNE',
+        'uflp': 'UFLP',
+        'select_problem_type': 'Choisir type',
+        'contact_info': '📞 Contact',
+        'email': 'Email',
+        'phone': 'Téléphone',
+        'fax': 'Fax',
         'reset': '🔄 Réinitialiser',
         'delete_state': '🗑️ Supprimer état',
     }
@@ -299,8 +317,11 @@ if 'paused' not in st.session_state:
     st.session_state.paused = False
 if 'stop_requested' not in st.session_state:
     st.session_state.stop_requested = False
-if 'result' not in st.session_state:
-    st.session_state.result = None
+
+# ------------------- معلومات الاتصال -------------------
+CONTACT_EMAIL = "zakibeny@gmail.com"
+CONTACT_PHONE = "0021355614305 / 00213779679073"
+CONTACT_FAX = "036495241"
 
 # ------------------- UFLP to ILP Conversion -------------------
 def uflp_to_ilp(f, c):
@@ -326,7 +347,7 @@ def uflp_to_ilp(f, c):
     return obj, A, b, n_vars, n_constraints, n
 
 # ------------------- Solution Evaluation -------------------
-def evaluate_solution(x, obj, A, b, sense, uflp_info=None):
+def evaluate_solution(x, obj, A, b, uflp_info=None):
     if uflp_info is not None:
         n_y = uflp_info['n_y']
         f = uflp_info['f']
@@ -343,21 +364,15 @@ def evaluate_solution(x, obj, A, b, sense, uflp_info=None):
         x_int = np.round(x).astype(int)
         x_int = np.maximum(x_int, 0)
         if np.all(A @ x_int <= b + 1e-6):
-            if sense == 1:
-                return obj @ x_int
-            else:
-                return -(obj @ x_int)
+            return obj @ x_int
         return float('inf')
 
-def lp_relaxation(obj, A, b, sense=1):
+def lp_relaxation(obj, A, b):
     n = len(obj)
     m = len(b)
-    prob = pulp.LpProblem("LP_Relax", pulp.LpMinimize if sense == 1 else pulp.LpMaximize)
+    prob = pulp.LpProblem("LP_Relax", pulp.LpMinimize)
     x = [pulp.LpVariable(f"x_{i}", lowBound=0, cat='Continuous') for i in range(n)]
-    if sense == 1:
-        prob += pulp.lpSum(obj[i] * x[i] for i in range(n))
-    else:
-        prob += pulp.lpSum(-obj[i] * x[i] for i in range(n))
+    prob += pulp.lpSum(obj[i] * x[i] for i in range(n))
     for j in range(m):
         prob += pulp.lpSum(A[j][i] * x[i] for i in range(n)) <= b[j]
     solver = pulp.PULP_CBC_CMD(msg=False)
@@ -365,10 +380,7 @@ def lp_relaxation(obj, A, b, sense=1):
     if prob.status == pulp.LpStatusOptimal:
         x_val = np.array([pulp.value(x[i]) for i in range(n)])
         obj_val = pulp.value(prob.objective)
-        if sense == 1:
-            return x_val, obj_val
-        else:
-            return x_val, -obj_val
+        return x_val, obj_val
     return None, None
 
 # ------------------- Algorithm Core Functions -------------------
@@ -399,7 +411,7 @@ def generate_biased_directions(x_lp, frac_idx, count, alpha, bias_strength=0.5):
         dirs.append(u)
     return np.array(dirs)
 
-def hierarchical_radial_scan(x_center, R_val, frac_idx, obj, A, b, best_cost, best_x, x_lp=None, sense=1, uflp_info=None):
+def hierarchical_radial_scan(x_center, R_val, frac_idx, obj, A, b, best_cost, best_x, x_lp=None, uflp_info=None):
     if len(frac_idx) == 0:
         return best_cost, best_x
     x_frac = x_center[frac_idx].copy()
@@ -415,29 +427,29 @@ def hierarchical_radial_scan(x_center, R_val, frac_idx, obj, A, b, best_cost, be
             x_cand_int = np.maximum(x_cand_int, 0)
             x_full = x_center.copy()
             x_full[frac_idx] = x_cand_int
-            cost = evaluate_solution(x_full, obj, A, b, sense, uflp_info)
+            cost = evaluate_solution(x_full, obj, A, b, uflp_info)
             if cost < local_best:
                 local_best = cost
                 local_best_x = x_full.copy()
     return local_best, local_best_x
 
-def local_search(x, best_cost, obj, A, b, sense=1, uflp_info=None):
+def local_search(x, best_cost, obj, A, b, uflp_info=None):
     n = len(x)
     best_x = x.copy()
     best = best_cost
     for i in range(n):
         x_new = best_x.copy()
         x_new[i] = 1 - x_new[i]
-        cost = evaluate_solution(x_new, obj, A, b, sense, uflp_info)
+        cost = evaluate_solution(x_new, obj, A, b, uflp_info)
         if cost < best:
             best = cost
             best_x = x_new
     return best, best_x
 
-def vcycle(x, obj, A, b, coarse, x_lp, best_cost, sense=1, uflp_info=None):
+def vcycle(x, obj, A, b, coarse, x_lp, best_cost, uflp_info=None):
     frac_idx = get_fractional_indices(x)
     R_val = compute_R(x)
-    new_cost, new_x = hierarchical_radial_scan(x, R_val, frac_idx, obj, A, b, best_cost, x, x_lp, sense, uflp_info)
+    new_cost, new_x = hierarchical_radial_scan(x, R_val, frac_idx, obj, A, b, best_cost, x, x_lp, uflp_info)
     if new_cost < best_cost:
         best_cost = new_cost
         x = new_x
@@ -449,14 +461,14 @@ def vcycle(x, obj, A, b, coarse, x_lp, best_cost, sense=1, uflp_info=None):
             x_full = x.copy()
             for idx, val in zip(coarse, xc):
                 x_full[idx] = val
-            cost = evaluate_solution(x_full, obj, A, b, sense, uflp_info)
+            cost = evaluate_solution(x_full, obj, A, b, uflp_info)
             if cost < best_coarse:
                 best_coarse = cost
                 best_x_coarse = x_full
         if best_coarse < best_cost:
             best_cost = best_coarse
             x = best_x_coarse
-    best_cost, x = local_search(x, best_cost, obj, A, b, sense, uflp_info)
+    best_cost, x = local_search(x, best_cost, obj, A, b, uflp_info)
     return best_cost, x
 
 # ------------------- Multi-format File Reading -------------------
@@ -466,7 +478,6 @@ def detect_file_format(text, filename=""):
     if not clean_lines:
         return 'unknown'
     
-    # Check by filename extension
     if 'gs250a-1' in filename.lower() or 'gs250a1' in filename.lower():
         return 'gs250a'
     
@@ -478,12 +489,11 @@ def detect_file_format(text, filename=""):
     parts = clean_lines[0].split()
     if len(parts) == 3 and parts[2] == '0':
         return 'uflp'
-    if len(parts) == 2 and all(p.replace('-','').replace('.','').isdigit() for p in parts):
+    if len(parts) == 2 and all(p.replace('-','').replace('.','').replace('e','').replace('E','').replace('+','').isdigit() for p in parts):
         return 'ilp'
     return 'unknown'
 
 def read_gs250a_file(text):
-    """قراءة ملفات gs250a-1"""
     lines = text.strip().splitlines()
     numbers = []
     for line in lines:
@@ -500,31 +510,23 @@ def read_gs250a_file(text):
     if len(numbers) < 3:
         raise ValueError("ملف gs250a-1 لا يحتوي على بيانات كافية")
     
-    # تنسيق gs250a-1: أول رقمين هما n, m
     n = int(numbers[0])
     m = int(numbers[1])
-    
     idx = 2
-    # معاملات الهدف
     if idx + n <= len(numbers):
         c = np.array(numbers[idx:idx+n])
         idx += n
     else:
         c = np.zeros(n)
-    
-    # مصفوفة القيود
     A = np.zeros((m, n))
     for i in range(m):
         if idx + n <= len(numbers):
             A[i] = numbers[idx:idx+n]
             idx += n
-    
-    # الطرف الأيمن
     if idx + m <= len(numbers):
         b = np.array(numbers[idx:idx+m])
     else:
         b = np.zeros(m)
-    
     return c, A, b, n, m
 
 def read_ilp_file(text):
@@ -581,30 +583,25 @@ def flexible_file_reader(text, filename=""):
     
     if format_type == 'gs250a':
         c_vec, A, b, n, m = read_gs250a_file(text)
-        st.success(f"✅ ملف gs250a-1 تم تحميله: {n} متغير, {m} قيد")
-        return c_vec, A, b, n, m, None, False
+        return c_vec, A, b, n, m, None, 'ilp'
     
     elif format_type == 'uflp':
         f, c, n, m = read_uflp_file(text)
         obj, A, b, n_vars, n_constraints, n_y = uflp_to_ilp(f, c)
         uflp_info = {'n_y': n_y, 'f': f, 'c': c}
-        st.success(f"✅ ملف UFLP تم تحميله: {n} مرفق, {m} عميل")
-        return obj, A, b, n, m, uflp_info, True
+        return obj, A, b, n, m, uflp_info, 'uflp'
     
     else:
         try:
             c_vec, A, b, n, m = read_ilp_file(text)
-            st.success(f"✅ ملف ILP تم تحميله: {n} متغير, {m} قيد")
-            return c_vec, A, b, n, m, None, False
+            return c_vec, A, b, n, m, None, 'ilp'
         except:
             try:
                 f, c, n, m = read_uflp_file(text)
                 obj, A, b, n_vars, n_constraints, n_y = uflp_to_ilp(f, c)
                 uflp_info = {'n_y': n_y, 'f': f, 'c': c}
-                st.success(f"✅ ملف UFLP تم تحميله: {n} مرفق, {m} عميل")
-                return obj, A, b, n, m, uflp_info, True
+                return obj, A, b, n, m, uflp_info, 'uflp'
             except Exception as e:
-                st.error(f"❌ خطأ في قراءة الملف: {str(e)}")
                 raise ValueError(f"Could not read file: {str(e)}")
 
 # ------------------- State Management -------------------
@@ -637,24 +634,24 @@ def delete_state(filename):
     return False
 
 # ------------------- Main Solving Function -------------------
-def solve_ahrh(obj, A, b, uflp_info, sense, max_cycles, k_coarse, patience,
+def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
                use_R, R_tol, stable_gap_needed,
                use_cost_repeat, cost_repeat_times,
                use_gap_repeat, gap_repeat_times,
                use_contraction, diff_tol, resume=False):
     
     n = len(obj)
-    x_lp, lp_val = lp_relaxation(obj, A, b, sense)
+    x_lp, lp_val = lp_relaxation(obj, A, b)
     if x_lp is None:
         lp_val = float('inf')
     
     if not resume:
         x = np.round(x_lp).astype(int) if x_lp is not None else np.zeros(n, dtype=int)
         x = np.maximum(x, 0)
-        best_cost = evaluate_solution(x, obj, A, b, sense, uflp_info)
+        best_cost = evaluate_solution(x, obj, A, b, uflp_info)
         if best_cost == float('inf'):
             x = np.zeros(n, dtype=int)
-            best_cost = evaluate_solution(x, obj, A, b, sense, uflp_info)
+            best_cost = evaluate_solution(x, obj, A, b, uflp_info)
         history = []
         total_time = 0.0
         start_cycle = 1
@@ -664,10 +661,10 @@ def solve_ahrh(obj, A, b, uflp_info, sense, max_cycles, k_coarse, patience,
             st.warning(t('no_state'))
             x = np.round(x_lp).astype(int) if x_lp is not None else np.zeros(n, dtype=int)
             x = np.maximum(x, 0)
-            best_cost = evaluate_solution(x, obj, A, b, sense, uflp_info)
+            best_cost = evaluate_solution(x, obj, A, b, uflp_info)
             if best_cost == float('inf'):
                 x = np.zeros(n, dtype=int)
-                best_cost = evaluate_solution(x, obj, A, b, sense, uflp_info)
+                best_cost = evaluate_solution(x, obj, A, b, uflp_info)
             history = []
             total_time = 0.0
             start_cycle = 1
@@ -700,690 +697,4 @@ def solve_ahrh(obj, A, b, uflp_info, sense, max_cycles, k_coarse, patience,
 
     if resume and len(history) > 0:
         cycles_log = history
-        gap_history = [h['gap'] for h in history]
-        R_history = [h['R'] for h in history]
-        diff_history = [h.get('diff', 0) for h in history]
-        last_cost = history[-1]['cost']
-        last_gap = history[-1]['gap']
-        last_R = history[-1]['R']
-        last_x = np.array(history[-1].get('best_so_far', x))
-        acceleration_active = history[-1].get('acceleration', False)
-
-    progress_bar = st.progress(0)
-    status_placeholder = st.empty()
-    details_placeholder = st.empty()
-    time_placeholder = st.empty()
-    pause_button_placeholder = st.empty()
-
-    for cycle in range(start_cycle, max_cycles+1):
-        while st.session_state.paused:
-            time.sleep(0.5)
-            if st.session_state.stop_requested:
-                st.session_state.stop_requested = False
-                st.session_state.paused = False
-                break
-        
-        if x_lp is not None:
-            open_now = np.where(x > 0.5)[0].tolist()
-            top_lp = np.argsort(-x_lp)[:k_coarse].tolist()
-            coarse = list(set(open_now + top_lp))
-            if len(coarse) > 10:
-                importance = [(i, x_lp[i]) for i in coarse]
-                importance.sort(key=lambda x: x[1], reverse=True)
-                coarse = [i for i, _ in importance[:10]]
-        else:
-            coarse = []
-        
-        new_cost, new_x = vcycle(x, obj, A, b, coarse, x_lp, best_cost, sense, uflp_info)
-        gap = (new_cost - lp_val) / lp_val * 100 if lp_val not in [0, float('inf')] else 0
-        R_val = compute_R(new_x)
-        diff = np.linalg.norm(new_x - last_x)
-        improved = new_cost < best_cost - 1e-6
-        
-        if improved:
-            best_cost = new_cost
-            x = new_x
-            no_improve = 0
-        else:
-            no_improve += 1
-        
-        gap_history.append(gap)
-        R_history.append(R_val)
-        diff_history.append(diff)
-        
-        entry = {
-            'cycle': cycle,
-            'cost': new_cost,
-            'gap': gap,
-            'R': R_val,
-            'diff': diff,
-            'improved': improved,
-            'best_so_far': best_cost,
-            'acceleration': acceleration_active
-        }
-        cycles_log.append(entry)
-        
-        progress = (cycle - start_cycle + 1) / (max_cycles - start_cycle + 1)
-        progress_bar.progress(progress)
-        
-        elapsed = total_time + (time.time() - start_time)
-        if cycle > start_cycle:
-            avg_time = elapsed / (cycle - start_cycle + 1)
-            remaining = avg_time * (max_cycles - cycle)
-        else:
-            remaining = 0
-        
-        status_placeholder.info(f"**🔵 Cycle {cycle} / {max_cycles}**")
-        details_placeholder.markdown(
-            f"""
-            <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; border-left: 5px solid #ff4b4b;">
-                <h4 style="color: #ff4b4b; margin: 0;">📊 معلومات التقدم</h4>
-                <p><b>💰 التكلفة الحالية:</b> {new_cost:,.2f}</p>
-                <p><b>📈 الفجوة:</b> {gap:.4f}%</p>
-                <p><b>🎯 R:</b> {R_val:.6f}</p>
-                <p><b>✨ تحسن:</b> {'✅' if improved else '❌'}</p>
-                <p><b>🏆 أفضل تكلفة:</b> {best_cost:,.2f}</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        time_placeholder.markdown(
-            f"""
-            <div style="background-color: #e8f0fe; padding: 10px; border-radius: 5px; border-left: 5px solid #2196f3;">
-                <h4 style="color: #2196f3; margin: 0;">⏱️ الوقت</h4>
-                <p><b>⏰ {t('elapsed_time')}:</b> {elapsed:.1f}s</p>
-                <p><b>⏳ {t('estimated_remaining')}:</b> {remaining:.1f}s</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        
-        if pause_button_placeholder.button(t('pause' if not st.session_state.paused else 'resume'), key=f"pause_{cycle}"):
-            st.session_state.paused = not st.session_state.paused
-            if st.session_state.paused:
-                st.info(f"⏸️ {t('paused')}")
-        
-        if not acceleration_active and gap < 2.0 and R_val < 0.01:
-            acceleration_active = True
-            st.success(f"⚡ {t('acceleration_on')}")
-        
-        stop_now = False
-        if no_improve >= patience:
-            stop_reason = f"{t('patience')} ({patience})"
-            stop_now = True
-        if not stop_now and use_R and R_val < R_tol:
-            if last_gap is not None and abs(gap - last_gap) < 1e-6:
-                stable_gap_count += 1
-                if stable_gap_count >= stable_gap_needed:
-                    stop_reason = f"R < {R_tol}"
-                    stop_now = True
-            else:
-                stable_gap_count = 0
-        if not stop_now and use_cost_repeat:
-            if last_cost is not None and abs(new_cost - last_cost) < 1e-6:
-                cost_repeat_count += 1
-                if cost_repeat_count >= cost_repeat_times:
-                    stop_reason = t('use_cost_repeat')
-                    stop_now = True
-            else:
-                cost_repeat_count = 0
-        if not stop_now and use_gap_repeat:
-            if last_gap is not None and abs(gap - last_gap) < 1e-6:
-                gap_repeat_count += 1
-                if gap_repeat_count >= gap_repeat_times:
-                    stop_reason = t('use_gap_repeat')
-                    stop_now = True
-            else:
-                gap_repeat_count = 0
-        if not stop_now and use_contraction:
-            if diff < diff_tol and R_val < R_tol:
-                stop_reason = t('use_contraction')
-                stop_now = True
-        
-        last_cost = new_cost
-        last_gap = gap
-        last_R = R_val
-        last_x = new_x.copy()
-        
-        if time.time() - last_save_time > 5:
-            problem_data = {
-                'type': 'UFLP' if uflp_info else 'ILP',
-                'n': n,
-                'sense': sense
-            }
-            save_state(STATE_FILE, cycle, best_cost, x, cycles_log, lp_val, elapsed, problem_data)
-            last_save_time = time.time()
-        
-        if stop_now:
-            cycles_done = cycle
-            break
-    
-    if cycles_done == 0:
-        cycles_done = max_cycles
-        stop_reason = f"{t('max_cycles')} ({max_cycles})"
-    
-    total_time = elapsed
-    
-    progress_bar.empty()
-    status_placeholder.empty()
-    details_placeholder.empty()
-    time_placeholder.empty()
-    pause_button_placeholder.empty()
-    
-    return {
-        'best_cost': best_cost,
-        'lp_val': lp_val,
-        'gap': (best_cost - lp_val) / lp_val * 100 if lp_val not in [0, float('inf')] else 0,
-        'cycles_done': cycles_done,
-        'gap_history': gap_history,
-        'R_history': R_history,
-        'diff_history': diff_history,
-        'cycles_log': cycles_log,
-        'stop_reason': stop_reason,
-        'acceleration_active': acceleration_active,
-        'total_time': total_time,
-        'open_fac': len(np.where(x > 0.5)[0]) if uflp_info else None
-    }
-
-# ------------------- Streamlit Interface -------------------
-st.set_page_config(
-    page_title="AHRH ILP/MILP Solver", 
-    page_icon="🧠", 
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Custom CSS
-st.markdown("""
-<style>
-    .main-header {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        padding: 20px;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
-        margin-bottom: 20px;
-    }
-    .info-box {
-        background-color: #e3f2fd;
-        padding: 15px;
-        border-radius: 8px;
-        border-left: 5px solid #2196f3;
-        margin: 10px 0;
-    }
-    .success-box {
-        background-color: #e8f5e8;
-        padding: 15px;
-        border-radius: 8px;
-        border-left: 5px solid #4caf50;
-        margin: 10px 0;
-    }
-    .warning-box {
-        background-color: #fff3e0;
-        padding: 15px;
-        border-radius: 8px;
-        border-left: 5px solid #ff9800;
-        margin: 10px 0;
-    }
-    .metric-card {
-        background: white;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        text-align: center;
-        margin: 5px;
-    }
-    .metric-value {
-        font-size: 24px;
-        font-weight: bold;
-        color: #333;
-    }
-    .metric-label {
-        font-size: 14px;
-        color: #666;
-        text-transform: uppercase;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# Language selector
-col1, col2, col3 = st.columns([3, 1, 1])
-with col2:
-    language = st.selectbox("🌐", ['English', 'Français', 'العربية'], key='language_selector')
-    st.session_state.language = language
-
-# Main header
-st.markdown(f"""
-<div class="main-header">
-    <h1>{t('app_title')}</h1>
-    <p>{t('app_desc')}</p>
-</div>
-""", unsafe_allow_html=True)
-
-st.caption(t('note_uflp'))
-
-# Sidebar parameters
-with st.sidebar:
-    st.markdown("## ⚙️ " + t('sidebar_algo'))
-    
-    max_cycles = st.slider(t('max_cycles'), 10, 500, 100, 10)
-    k_coarse = st.slider(t('k_coarse'), 3, 30, 15)
-    patience = st.slider(t('patience'), 5, 100, 20)
-    
-    st.markdown("---")
-    st.markdown("## ⏹️ " + t('sidebar_stop'))
-    st.markdown(t('choose_criteria'))
-    
-    use_R = st.checkbox(t('use_R'), value=True)
-    if use_R:
-        R_tol = st.number_input(t('R_tol'), value=1e-4, format="%.0e", step=1e-4)
-        stable_gap_needed = st.number_input(t('stable_gap'), min_value=1, max_value=20, value=5)
-    else:
-        R_tol, stable_gap_needed = 1e-4, 5
-    
-    use_cost_repeat = st.checkbox(t('use_cost_repeat'), value=False)
-    if use_cost_repeat:
-        cost_repeat_times = st.number_input(t('cost_repeat_times'), min_value=2, max_value=50, value=10)
-    else:
-        cost_repeat_times = 10
-    
-    use_gap_repeat = st.checkbox(t('use_gap_repeat'), value=False)
-    if use_gap_repeat:
-        gap_repeat_times = st.number_input(t('gap_repeat_times'), min_value=2, max_value=50, value=10)
-    else:
-        gap_repeat_times = 10
-    
-    use_contraction = st.checkbox(t('use_contraction'), value=True)
-    if use_contraction:
-        diff_tol = st.number_input(t('diff_tol'), value=1e-8, format="%.0e", step=1e-8)
-    else:
-        diff_tol = 1e-8
-    
-    st.markdown("---")
-    st.write(f"👥 {t('workers')}: {NUM_WORKERS}")
-    
-    if os.path.exists(STATE_FILE):
-        if st.button(t('delete_state')):
-            if delete_state(STATE_FILE):
-                st.success(t('delete_state'))
-                st.rerun()
-
-# Main tabs
-tab1, tab2 = st.tabs([t('tab_upload'), t('tab_manual')])
-
-with tab1:
-    st.markdown(f"""
-    <div class="info-box">
-        <h3>📂 {t('upload_header')}</h3>
-        <p>{t('upload_info')}</p>
-        <p><small>{t('supported_formats')}</small></p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    with st.expander("📄 " + t('supported_formats')):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**ILP:**\n" + t('ilp_format_help'))
-            st.markdown("**UFLP:**\n" + t('uflp_format_help'))
-        with col2:
-            st.markdown("**MPS:**\n" + t('mps_format_help'))
-            st.markdown("**KoerkelGhosh/gs250a-1:**\n" + t('koerkel_help'))
-    
-    uploaded_file = st.file_uploader(
-        t('choose_file'), 
-        type=ALLOWED_EXTENSIONS,
-        help=t('supported_formats')
-    )
-    
-    if uploaded_file is not None:
-        file_details = {
-            t('file_name'): uploaded_file.name,
-            t('file_size'): f"{uploaded_file.size / 1024:.2f} KB"
-        }
-        st.json(file_details)
-        
-        if st.button(t('solve_button'), key="solve_upload"):
-            with st.spinner("🔄 " + t('solve_button')):
-                try:
-                    text = uploaded_file.getvalue().decode("utf-8", errors='ignore')
-                except:
-                    text = uploaded_file.getvalue().decode("latin-1", errors='ignore')
-                
-                try:
-                    obj, A, b, n, m, uflp_info, is_uflp = flexible_file_reader(text, uploaded_file.name)
-                    sense = 1
-                    
-                    # Problem info
-                    st.markdown(f"""
-                    <div class="success-box">
-                        <h4>✅ {t('problem_info')}</h4>
-                        <p><b>{t('variables')}:</b> {n}</p>
-                        <p><b>{t('constraints')}:</b> {m}</p>
-                        <p><b>{t('var_type')}:</b> {'UFLP (Binary)' if is_uflp else 'ILP/MILP'}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Check for saved state
-                    if os.path.exists(STATE_FILE):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.button(t('resume')):
-                                result = solve_ahrh(obj, A, b, uflp_info, sense,
-                                                    max_cycles, k_coarse, patience,
-                                                    use_R, R_tol, stable_gap_needed,
-                                                    use_cost_repeat, cost_repeat_times,
-                                                    use_gap_repeat, gap_repeat_times,
-                                                    use_contraction, diff_tol,
-                                                    resume=True)
-                                st.session_state.result = result
-                                st.rerun()
-                        with col2:
-                            if st.button(t('reset')):
-                                if os.path.exists(STATE_FILE):
-                                    os.remove(STATE_FILE)
-                                result = solve_ahrh(obj, A, b, uflp_info, sense,
-                                                    max_cycles, k_coarse, patience,
-                                                    use_R, R_tol, stable_gap_needed,
-                                                    use_cost_repeat, cost_repeat_times,
-                                                    use_gap_repeat, gap_repeat_times,
-                                                    use_contraction, diff_tol,
-                                                    resume=False)
-                                st.session_state.result = result
-                                st.rerun()
-                    else:
-                        result = solve_ahrh(obj, A, b, uflp_info, sense,
-                                            max_cycles, k_coarse, patience,
-                                            use_R, R_tol, stable_gap_needed,
-                                            use_cost_repeat, cost_repeat_times,
-                                            use_gap_repeat, gap_repeat_times,
-                                            use_contraction, diff_tol,
-                                            resume=False)
-                        st.session_state.result = result
-                        st.rerun()
-                
-                except Exception as e:
-                    st.error(f"❌ {t('error')}: {str(e)}")
-                    st.code(traceback.format_exc())
-
-with tab2:
-    st.markdown(f"""
-    <div class="warning-box">
-        <h3>✍️ {t('manual_header')}</h3>
-        <p>{t('manual_warning')}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        n_man = st.number_input(t('manual_n'), min_value=1, max_value=10, value=3, step=1, key="n_man")
-    with col2:
-        m_man = st.number_input(t('manual_m'), min_value=1, max_value=10, value=3, step=1, key="m_man")
-    
-    if 'c_man' not in st.session_state or len(st.session_state.c_man) != n_man:
-        st.session_state.c_man = np.zeros(n_man)
-    if 'A_man' not in st.session_state or st.session_state.A_man.shape != (m_man, n_man):
-        st.session_state.A_man = np.zeros((m_man, n_man))
-    if 'b_man' not in st.session_state or len(st.session_state.b_man) != m_man:
-        st.session_state.b_man = np.zeros(m_man)
-    
-    st.subheader(t('manual_c'))
-    c_vals = []
-    cols = st.columns(min(5, n_man))
-    for i in range(n_man):
-        with cols[i % 5]:
-            val = st.number_input(f"c[{i}]", value=float(st.session_state.c_man[i]), key=f"c_man_{i}")
-            c_vals.append(val)
-    st.session_state.c_man = np.array(c_vals)
-    
-    st.subheader(t('manual_A'))
-    for i in range(m_man):
-        st.write(f"**{t('constraints')} {i+1}:**")
-        cols = st.columns(min(5, n_man))
-        for j in range(n_man):
-            with cols[j % 5]:
-                val = st.number_input(f"A[{i}][{j}]", value=float(st.session_state.A_man[i, j]), key=f"A_man_{i}_{j}")
-                st.session_state.A_man[i, j] = val
-    
-    st.subheader(t('manual_b'))
-    b_vals = []
-    cols = st.columns(min(5, m_man))
-    for i in range(m_man):
-        with cols[i % 5]:
-            val = st.number_input(f"b[{i}]", value=float(st.session_state.b_man[i]), key=f"b_man_{i}")
-            b_vals.append(val)
-    st.session_state.b_man = np.array(b_vals)
-    
-    if st.button(t('solve_button'), key="solve_manual"):
-        with st.spinner("🔄 " + t('solve_button')):
-            try:
-                c_vec = st.session_state.c_man
-                A = st.session_state.A_man
-                b = st.session_state.b_man
-                obj = c_vec
-                uflp_info = None
-                sense = 1
-                
-                if os.path.exists(STATE_FILE):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button(t('resume'), key="resume_manual"):
-                            result = solve_ahrh(obj, A, b, uflp_info, sense,
-                                                max_cycles, k_coarse, patience,
-                                                use_R, R_tol, stable_gap_needed,
-                                                use_cost_repeat, cost_repeat_times,
-                                                use_gap_repeat, gap_repeat_times,
-                                                use_contraction, diff_tol,
-                                                resume=True)
-                            st.session_state.result = result
-                            st.rerun()
-                    with col2:
-                        if st.button(t('reset'), key="reset_manual"):
-                            if os.path.exists(STATE_FILE):
-                                os.remove(STATE_FILE)
-                            result = solve_ahrh(obj, A, b, uflp_info, sense,
-                                                max_cycles, k_coarse, patience,
-                                                use_R, R_tol, stable_gap_needed,
-                                                use_cost_repeat, cost_repeat_times,
-                                                use_gap_repeat, gap_repeat_times,
-                                                use_contraction, diff_tol,
-                                                resume=False)
-                            st.session_state.result = result
-                            st.rerun()
-                else:
-                    result = solve_ahrh(obj, A, b, uflp_info, sense,
-                                        max_cycles, k_coarse, patience,
-                                        use_R, R_tol, stable_gap_needed,
-                                        use_cost_repeat, cost_repeat_times,
-                                        use_gap_repeat, gap_repeat_times,
-                                        use_contraction, diff_tol,
-                                        resume=False)
-                    st.session_state.result = result
-                    st.rerun()
-            
-            except Exception as e:
-                st.error(f"❌ {t('error')}: {str(e)}")
-                st.code(traceback.format_exc())
-
-# ------------------- Results Display -------------------
-st.markdown("---")
-
-if st.session_state.result is not None:
-    res = st.session_state.result
-    
-    st.markdown(f"""
-    <div class="success-box">
-        <h2>📊 {t('results')}</h2>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Metrics in cards
-    colA, colB, colC, colD = st.columns(4)
-    with colA:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{res['best_cost']:,.2f}</div>
-            <div class="metric-label">{t('best_cost')}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with colB:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{res['lp_val']:,.2f}</div>
-            <div class="metric-label">{t('lp_val')}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with colC:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{res['gap']:.4f}%</div>
-            <div class="metric-label">{t('gap')}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with colD:
-        val = res['open_fac'] if res['open_fac'] is not None else f"{st.session_state.get('n', 0)}×{st.session_state.get('m', 0)}"
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{val}</div>
-            <div class="metric-label">{t('open_fac') if res['open_fac'] is not None else t('size')}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    colE, colF, colG = st.columns(3)
-    with colE:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{res['cycles_done']}</div>
-            <div class="metric-label">{t('cycles_done')}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with colF:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{res['total_time']:.2f}s</div>
-            <div class="metric-label">{t('time')}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with colG:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{res['stop_reason']}</div>
-            <div class="metric-label">{t('stop_reason')}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    if res.get('acceleration_active'):
-        st.success(f"⚡ {t('acceleration_on')}")
-    
-    # Plots
-    if res['gap_history']:
-        st.subheader(t('gap_plot'))
-        
-        plot_tab1, plot_tab2, plot_tab3 = st.tabs([t('gap_by_cycles'), t('gap_by_R'), t('convergence_plot')])
-        
-        with plot_tab1:
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
-            cycles = list(range(1, len(res['gap_history'])+1))
-            
-            # Gap vs Cycles with shaded area
-            ax1.plot(cycles, res['gap_history'], 'b-', linewidth=2, label=t('gap_label'))
-            ax1.fill_between(cycles, 0, res['gap_history'], alpha=0.3, color='blue')
-            ax1.set_xlabel(t('cycle'))
-            ax1.set_ylabel(t('gap_label'))
-            ax1.set_title(t('cycles_vs_gap'))
-            ax1.grid(True, alpha=0.3)
-            ax1.legend()
-            
-            # R vs Cycles with shaded area
-            ax2.plot(cycles, res['R_history'], 'r-', linewidth=2, label=t('R_label'))
-            ax2.fill_between(cycles, 0, res['R_history'], alpha=0.3, color='red')
-            ax2.set_xlabel(t('cycle'))
-            ax2.set_ylabel(t('R_label'))
-            ax2.set_title(f'R {t("vs")} {t("cycle")}')
-            ax2.grid(True, alpha=0.3)
-            ax2.legend()
-            
-            plt.tight_layout()
-            st.pyplot(fig)
-        
-        with plot_tab2:
-            fig, ax = plt.subplots(figsize=(12, 6))
-            
-            # Gap vs R scatter with color gradient
-            scatter = ax.scatter(res['R_history'], res['gap_history'], 
-                               c=cycles, cmap='viridis', s=100, alpha=0.6, edgecolors='black', linewidth=0.5)
-            ax.set_xlabel(t('R_label'))
-            ax.set_ylabel(t('gap_label'))
-            ax.set_title(t('R_vs_gap'))
-            ax.grid(True, alpha=0.3)
-            plt.colorbar(scatter, ax=ax, label=t('cycle'))
-            
-            # Trend line
-            if len(res['R_history']) > 1:
-                z = np.polyfit(res['R_history'], res['gap_history'], 1)
-                p = np.poly1d(z)
-                ax.plot(res['R_history'], p(res['R_history']), "r--", alpha=0.8, linewidth=2, label='Trend')
-                ax.legend()
-            
-            plt.tight_layout()
-            st.pyplot(fig)
-        
-        with plot_tab3:
-            fig, ax = plt.subplots(figsize=(12, 6))
-            
-            # Convergence plot with log scale
-            ax.semilogy(cycles, res['gap_history'], 'b-', linewidth=2, label=t('gap_label'))
-            ax.semilogy(cycles, res['R_history'], 'r-', linewidth=2, label=t('R_label'))
-            ax.set_xlabel(t('cycle'))
-            ax.set_ylabel('Value (log scale)')
-            ax.set_title(t('convergence_plot'))
-            ax.grid(True, alpha=0.3, which='both')
-            ax.legend()
-            
-            plt.tight_layout()
-            st.pyplot(fig)
-        
-        # Cycle log
-        st.subheader(t('cycle_log'))
-        df_cycles = pd.DataFrame(res['cycles_log'])
-        df_cycles = df_cycles.rename(columns={
-            'cycle': t('cycle'),
-            'cost': t('cost'),
-            'gap': t('gap'),
-            'R': 'R',
-            'diff': 'Diff',
-            'improved': t('improved'),
-            'best_so_far': t('best_so_far')
-        })
-        df_cycles[t('improved')] = df_cycles[t('improved')].apply(lambda x: t('yes') if x else t('no'))
-        st.dataframe(df_cycles, use_container_width=True)
-        
-        # Download
-        df = pd.DataFrame({
-            t('cycle'): cycles,
-            t('gap_label'): res['gap_history'],
-            'R': res['R_history']
-        })
-        csv = df.to_csv(index=False)
-        st.download_button(
-            label=t('download'),
-            data=csv,
-            file_name=f"ahrh_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
-else:
-    st.markdown(f"""
-    <div class="info-box">
-        <h3>👈 {t('info_placeholder')}</h3>
-        <p>{t('supported_formats')}</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-# Footer
-st.markdown("---")
-st.markdown(f"""
-<div style="text-align: center; color: #666; padding: 20px;">
-    <p>{t('footer')}</p>
-    <p>🔬 AHRH Algorithm - Patented Technology</p>
-    <p>📧 Contact: zakarya.benregreg@example.com</p>
-</div>
-""", unsafe_allow_html=True)
+        gap_history = [h['gap']
