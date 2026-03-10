@@ -1,6 +1,3 @@
-أرى أنك تريد دمج الميزات من البرنامج القديم مع البرنامج الجديد. سأقوم بإنشاء برنامج كامل يجمع كل الميزات المطلوبة:
-
-```python
 # -*- coding: utf-8 -*-
 """
 AHRH: حل مسائل البرمجة الصحيحة (ILP/MILP) ومسائل مواقع المرافق (UFLP)
@@ -28,14 +25,14 @@ STATE_FILE = "ahrh_state.json"
 # ------------------- ترجمة النصوص -------------------
 translations = {
     'العربية': {
-        'app_title': '🧠 AHRH: حلول البرمجة الصحيحة (ILP/MILP) و UFLP',
+        'app_title': 'AHRH: حلول البرمجة الصحيحة (ILP/MILP) و UFLP',
         'app_desc': 'تطبيق لحل مسائل البرمجة الصحيحة (ILP) والبرمجة الصحيحة المختلطة (MILP) ومسائل مواقع المرافق (UFLP) باستخدام خوارزمية AHRH.',
         'note_uflp': 'ملاحظة: يتم تحويل مسائل UFLP تلقائياً إلى ILP.',
-        'sidebar_algo': '⚙️ معاملات الخوارزمية',
+        'sidebar_algo': 'معاملات الخوارزمية',
         'max_cycles': 'عدد الدورات الأقصى',
         'k_coarse': 'حجم المجموعة الخشنة (k)',
         'patience': 'الصبر (عدد الدورات بدون تحسن)',
-        'sidebar_stop': '⏹️ معايير التوقف',
+        'sidebar_stop': 'معايير التوقف',
         'choose_criteria': 'اختر مجموعة من الشروط (عند تحقق أي منها تتوقف):',
         'use_R': 'استخدام عتبة R (مع استقرار الفجوة)',
         'R_tol': 'قيمة R الصغرى (ε)',
@@ -47,8 +44,8 @@ translations = {
         'use_contraction': 'استخدام معيار الانكماش (diff + R)',
         'diff_tol': 'عتبة الفرق بين الحلول (ε₁)',
         'workers': 'عدد العمال (للتوازي)',
-        'tab_upload': '📂 رفع ملف',
-        'tab_manual': '✍️ إدخال يدوي',
+        'tab_upload': 'رفع ملف',
+        'tab_manual': 'إدخال يدوي',
         'upload_header': 'رفع ملف المسألة',
         'upload_info': 'يدعم جميع الصيغ: ILP, MILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1',
         'choose_file': 'اختر ملف المسألة',
@@ -66,8 +63,8 @@ translations = {
         'manual_b': 'الطرف الأيمن b[i]',
         'manual_f': 'تكاليف الفتح f[i]',
         'manual_costs': 'تكاليف النقل c[i][j]',
-        'solve_button': '🚀 حل المسألة',
-        'results': '📊 النتائج',
+        'solve_button': 'حل المسألة',
+        'results': 'النتائج',
         'best_cost': 'أفضل تكلفة',
         'lp_val': 'قيمة LP',
         'gap': 'الفجوة (%)',
@@ -76,27 +73,27 @@ translations = {
         'time': 'الزمن (ث)',
         'size': 'الحجم',
         'stop_reason': 'سبب التوقف',
-        'gap_plot': '📈 تطور الفجوة و R',
+        'gap_plot': 'تطور الفجوة و R',
         'gap_label': 'الفجوة',
         'R_label': 'R',
-        'cycle_log': '📋 سجل الدورات',
+        'cycle_log': 'سجل الدورات',
         'cycle': 'دورة',
         'cost': 'التكلفة',
         'improved': 'تحسن',
         'best_so_far': 'أفضل حتى الآن',
         'yes': 'نعم',
         'no': 'لا',
-        'download': '📥 تحميل التطور',
-        'info_placeholder': '👈 اختر مصدر المسألة',
+        'download': 'تحميل التطور',
+        'info_placeholder': 'اختر مصدر المسألة',
         'footer': 'تم التطوير بواسطة Zakarya Benregreg - AHRH خوارزمية محمية ببراءة اختراع',
-        'acceleration_on': '⚡ وضع التسريع مُفعّل',
+        'acceleration_on': 'وضع التسريع مُفعّل',
         'acceleration_off': 'وضع التسريع غير مُفعّل',
-        'save_state': '💾 تم حفظ الحالة',
-        'resume_state': '🔄 تم العثور على حالة محفوظة',
-        'no_state': '🆕 لا توجد حالة محفوظة',
-        'pause': '⏸️ إيقاف مؤقت',
-        'resume': '▶️ استئناف',
-        'paused': '⏸️ تم الإيقاف المؤقت',
+        'save_state': 'تم حفظ الحالة',
+        'resume_state': 'تم العثور على حالة محفوظة',
+        'no_state': 'لا توجد حالة محفوظة',
+        'pause': 'إيقاف مؤقت',
+        'resume': 'استئناف',
+        'paused': 'تم الإيقاف المؤقت',
         'elapsed_time': 'الوقت المنقضي',
         'estimated_remaining': 'الوقت المتبقي',
         'gap_by_cycles': 'الفجوة حسب الدورات',
@@ -114,22 +111,23 @@ translations = {
         'milp': 'برمجة صحيحة مختلطة (MILP)',
         'uflp': 'مسألة مواقع المرافق (UFLP)',
         'select_problem_type': 'اختر نوع المسألة',
-        'contact_info': '📞 معلومات الاتصال',
+        'contact_info': 'معلومات الاتصال',
         'email': 'البريد الإلكتروني',
         'phone': 'الهاتف',
         'fax': 'فاكس',
-        'reset': '🔄 إعادة تعيين',
-        'delete_state': '🗑️ حذف الحالة المحفوظة',
+        'reset': 'إعادة تعيين',
+        'delete_state': 'حذف الحالة المحفوظة',
+        'error': 'خطأ',
     },
     'English': {
-        'app_title': '🧠 AHRH: Integer/Mixed-Integer Programming & UFLP Solver',
+        'app_title': 'AHRH: Integer/Mixed-Integer Programming & UFLP Solver',
         'app_desc': 'Solve ILP, MILP, and UFLP problems using the patented AHRH algorithm.',
         'note_uflp': 'Note: UFLP problems are automatically converted to ILP.',
-        'sidebar_algo': '⚙️ Algorithm Parameters',
+        'sidebar_algo': 'Algorithm Parameters',
         'max_cycles': 'Max Cycles',
         'k_coarse': 'Coarse Set Size (k)',
         'patience': 'Patience',
-        'sidebar_stop': '⏹️ Stopping Criteria',
+        'sidebar_stop': 'Stopping Criteria',
         'choose_criteria': 'Choose any combination:',
         'use_R': 'Use R threshold',
         'R_tol': 'R tolerance (ε)',
@@ -141,8 +139,8 @@ translations = {
         'use_contraction': 'Use contraction criterion',
         'diff_tol': 'Difference tolerance (ε₁)',
         'workers': 'Workers',
-        'tab_upload': '📂 Upload File',
-        'tab_manual': '✍️ Manual Input',
+        'tab_upload': 'Upload File',
+        'tab_manual': 'Manual Input',
         'upload_header': 'Upload Problem File',
         'upload_info': 'Supports all formats: ILP, MILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1',
         'choose_file': 'Choose a file',
@@ -160,8 +158,8 @@ translations = {
         'manual_b': 'Right-hand side b[i]',
         'manual_f': 'Opening costs f[i]',
         'manual_costs': 'Transport costs c[i][j]',
-        'solve_button': '🚀 Solve Problem',
-        'results': '📊 Results',
+        'solve_button': 'Solve Problem',
+        'results': 'Results',
         'best_cost': 'Best Cost',
         'lp_val': 'LP Value',
         'gap': 'Gap (%)',
@@ -170,27 +168,27 @@ translations = {
         'time': 'Time (s)',
         'size': 'Size',
         'stop_reason': 'Stop Reason',
-        'gap_plot': '📈 Gap & R Evolution',
+        'gap_plot': 'Gap & R Evolution',
         'gap_label': 'Gap',
         'R_label': 'R',
-        'cycle_log': '📋 Cycle Log',
+        'cycle_log': 'Cycle Log',
         'cycle': 'Cycle',
         'cost': 'Cost',
         'improved': 'Improved',
         'best_so_far': 'Best so far',
         'yes': 'Yes',
         'no': 'No',
-        'download': '📥 Download',
-        'info_placeholder': '👈 Choose data source',
+        'download': 'Download',
+        'info_placeholder': 'Choose data source',
         'footer': 'Developed by Zakarya Benregreg - AHRH patented algorithm',
-        'acceleration_on': '⚡ Acceleration ON',
+        'acceleration_on': 'Acceleration ON',
         'acceleration_off': 'Acceleration OFF',
-        'save_state': '💾 State saved',
-        'resume_state': '🔄 Found saved state',
-        'no_state': '🆕 No saved state',
-        'pause': '⏸️ Pause',
-        'resume': '▶️ Resume',
-        'paused': '⏸️ Paused',
+        'save_state': 'State saved',
+        'resume_state': 'Found saved state',
+        'no_state': 'No saved state',
+        'pause': 'Pause',
+        'resume': 'Resume',
+        'paused': 'Paused',
         'elapsed_time': 'Elapsed Time',
         'estimated_remaining': 'Estimated Remaining',
         'gap_by_cycles': 'Gap by Cycles',
@@ -208,22 +206,23 @@ translations = {
         'milp': 'Mixed-Integer Programming (MILP)',
         'uflp': 'Facility Location (UFLP)',
         'select_problem_type': 'Select Problem Type',
-        'contact_info': '📞 Contact Information',
+        'contact_info': 'Contact Information',
         'email': 'Email',
         'phone': 'Phone',
         'fax': 'Fax',
-        'reset': '🔄 Reset',
-        'delete_state': '🗑️ Delete Saved State',
+        'reset': 'Reset',
+        'delete_state': 'Delete Saved State',
+        'error': 'Error',
     },
     'Français': {
-        'app_title': '🧠 AHRH: Solveur PLNE/PLMNE et UFLP',
+        'app_title': 'AHRH: Solveur PLNE/PLMNE et UFLP',
         'app_desc': 'Résoudre des problèmes PLNE, PLMNE et UFLP avec l\'algorithme AHRH breveté.',
         'note_uflp': 'Note: Les problèmes UFLP sont convertis automatiquement en PLNE.',
-        'sidebar_algo': '⚙️ Paramètres',
+        'sidebar_algo': 'Paramètres',
         'max_cycles': 'Cycles max',
         'k_coarse': 'Taille ensemble grossier (k)',
         'patience': 'Patience',
-        'sidebar_stop': '⏹️ Critères d\'arrêt',
+        'sidebar_stop': "Critères d'arrêt",
         'choose_criteria': 'Choisissez une combinaison:',
         'use_R': 'Utiliser seuil R',
         'R_tol': 'Tolérance R (ε)',
@@ -235,8 +234,8 @@ translations = {
         'use_contraction': 'Critère contraction',
         'diff_tol': 'Tolérance différence (ε₁)',
         'workers': 'Travailleurs',
-        'tab_upload': '📂 Fichier',
-        'tab_manual': '✍️ Saisie',
+        'tab_upload': 'Fichier',
+        'tab_manual': 'Saisie',
         'upload_header': 'Charger fichier',
         'upload_info': 'Tous formats: ILP, MILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1',
         'choose_file': 'Choisir fichier',
@@ -252,10 +251,10 @@ translations = {
         'manual_c': 'Coefficients c[i]',
         'manual_A': 'Matrice A[i][j]',
         'manual_b': 'Second membre b[i]',
-        'manual_f': 'Coûts ouverture f[i]',
+        'manual_f': "Coûts d'ouverture f[i]",
         'manual_costs': 'Coûts transport c[i][j]',
-        'solve_button': '🚀 Résoudre',
-        'results': '📊 Résultats',
+        'solve_button': 'Résoudre',
+        'results': 'Résultats',
         'best_cost': 'Meilleur coût',
         'lp_val': 'Valeur LP',
         'gap': 'Écart (%)',
@@ -263,28 +262,28 @@ translations = {
         'cycles_done': 'Cycles',
         'time': 'Temps (s)',
         'size': 'Taille',
-        'stop_reason': 'Raison arrêt',
-        'gap_plot': '📈 Évolution',
+        'stop_reason': "Raison d'arrêt",
+        'gap_plot': 'Évolution',
         'gap_label': 'Écart',
         'R_label': 'R',
-        'cycle_log': '📋 Journal',
+        'cycle_log': 'Journal',
         'cycle': 'Cycle',
         'cost': 'Coût',
         'improved': 'Amélioré',
         'best_so_far': 'Meilleur',
         'yes': 'Oui',
         'no': 'Non',
-        'download': '📥 Télécharger',
-        'info_placeholder': '👈 Choisissez source',
+        'download': 'Télécharger',
+        'info_placeholder': 'Choisissez source',
         'footer': 'Développé par Zakarya Benregreg - Algorithme AHRH breveté',
-        'acceleration_on': '⚡ Mode accélération',
+        'acceleration_on': 'Mode accélération',
         'acceleration_off': 'Mode normal',
-        'save_state': '💾 État sauvegardé',
-        'resume_state': '🔄 État trouvé',
-        'no_state': '🆕 Pas d\'état',
-        'pause': '⏸️ Pause',
-        'resume': '▶️ Reprendre',
-        'paused': '⏸️ En pause',
+        'save_state': 'État sauvegardé',
+        'resume_state': 'État trouvé',
+        'no_state': "Pas d'état",
+        'pause': 'Pause',
+        'resume': 'Reprendre',
+        'paused': 'En pause',
         'elapsed_time': 'Temps écoulé',
         'estimated_remaining': 'Temps restant',
         'gap_by_cycles': 'Écart par cycles',
@@ -302,12 +301,13 @@ translations = {
         'milp': 'PLMNE',
         'uflp': 'UFLP',
         'select_problem_type': 'Choisir type',
-        'contact_info': '📞 Contact',
+        'contact_info': 'Contact',
         'email': 'Email',
         'phone': 'Téléphone',
         'fax': 'Fax',
-        'reset': '🔄 Réinitialiser',
-        'delete_state': '🗑️ Supprimer état',
+        'reset': 'Réinitialiser',
+        'delete_state': "Supprimer l'état",
+        'error': 'Erreur',
     }
 }
 
@@ -779,17 +779,17 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
             else:
                 remaining = 0
             
-            status_placeholder.info(f"**🔵 Cycle {cycle} / {max_cycles}**")
+            status_placeholder.info(f"Cycle {cycle} / {max_cycles}")
             details_placeholder.markdown(
                 f"""
                 <div style="background-color: #fff3f3; padding: 15px; border-radius: 10px; border-left: 8px solid #ff4b4b; margin: 10px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                    <h4 style="color: #ff4b4b; margin: 0; font-size: 20px;">📊 معلومات التقدم</h4>
-                    <p style="font-size: 18px;"><b>💰 التكلفة الحالية:</b> {new_cost:,.2f}</p>
-                    <p style="font-size: 18px;"><b>📈 الفجوة:</b> {gap:.4f}%</p>
-                    <p style="font-size: 18px;"><b>🎯 R:</b> {R_val:.6f}</p>
-                    <p style="font-size: 18px;"><b>✨ تحسن:</b> {'✅' if improved else '❌'}</p>
-                    <p style="font-size: 18px;"><b>🏆 أفضل تكلفة:</b> {best_cost:,.2f}</p>
-                    <p style="font-size: 16px; color: #666;"><b>⏱️ وقت الدورة:</b> {time.time() - (start_time + total_time - elapsed):.3f} ث</p>
+                    <h4 style="color: #ff4b4b; margin: 0; font-size: 20px;">معلومات التقدم</h4>
+                    <p style="font-size: 18px;"><b>التكلفة الحالية:</b> {new_cost:,.2f}</p>
+                    <p style="font-size: 18px;"><b>الفجوة:</b> {gap:.4f}%</p>
+                    <p style="font-size: 18px;"><b>R:</b> {R_val:.6f}</p>
+                    <p style="font-size: 18px;"><b>تحسن:</b> {'✅' if improved else '❌'}</p>
+                    <p style="font-size: 18px;"><b>أفضل تكلفة:</b> {best_cost:,.2f}</p>
+                    <p style="font-size: 16px; color: #666;"><b>وقت الدورة:</b> {time.time() - (start_time + total_time - elapsed):.3f} ث</p>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -797,9 +797,9 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
             time_placeholder.markdown(
                 f"""
                 <div style="background-color: #e3f2fd; padding: 15px; border-radius: 10px; border-left: 8px solid #2196f3; margin: 10px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                    <h4 style="color: #2196f3; margin: 0; font-size: 20px;">⏱️ الوقت</h4>
-                    <p style="font-size: 18px;"><b>⏰ {t('elapsed_time')}:</b> {elapsed:.2f} ث</p>
-                    <p style="font-size: 18px;"><b>⏳ {t('estimated_remaining')}:</b> {remaining:.2f} ث</p>
+                    <h4 style="color: #2196f3; margin: 0; font-size: 20px;">الوقت</h4>
+                    <p style="font-size: 18px;"><b>{t('elapsed_time')}:</b> {elapsed:.2f} ث</p>
+                    <p style="font-size: 18px;"><b>{t('estimated_remaining')}:</b> {remaining:.2f} ث</p>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -808,11 +808,11 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
             if pause_button_placeholder.button(t('pause' if not st.session_state.paused else 'resume'), key=f"pause_{cycle}"):
                 st.session_state.paused = not st.session_state.paused
                 if st.session_state.paused:
-                    st.info(f"⏸️ {t('paused')}")
+                    st.info(t('paused'))
             
             if not acceleration_active and gap < 2.0 and R_val < 0.01:
                 acceleration_active = True
-                st.success(f"⚡ {t('acceleration_on')}")
+                st.success(t('acceleration_on'))
             
             stop_now = False
             if no_improve >= patience:
@@ -1017,14 +1017,14 @@ st.caption(t('note_uflp'))
 
 # Sidebar parameters
 with st.sidebar:
-    st.markdown("## ⚙️ " + t('sidebar_algo'))
+    st.markdown(f"## {t('sidebar_algo')}")
     
     max_cycles = st.slider(t('max_cycles'), 10, 200, 50, 10)
     k_coarse = st.slider(t('k_coarse'), 3, 20, 10)
     patience = st.slider(t('patience'), 5, 50, 15)
     
     st.markdown("---")
-    st.markdown("## ⏹️ " + t('sidebar_stop'))
+    st.markdown(f"## {t('sidebar_stop')}")
     st.markdown(t('choose_criteria'))
     
     use_R = st.checkbox(t('use_R'), value=True)
@@ -1053,7 +1053,7 @@ with st.sidebar:
         diff_tol = 1e-8
     
     st.markdown("---")
-    st.write(f"👥 {t('workers')}: {NUM_WORKERS}")
+    st.write(f"{t('workers')}: {NUM_WORKERS}")
     
     if os.path.exists(STATE_FILE):
         if st.button(t('delete_state')):
@@ -1075,20 +1075,20 @@ tab1, tab2 = st.tabs([t('tab_upload'), t('tab_manual')])
 with tab1:
     st.markdown(f"""
     <div class="info-box">
-        <h3>📂 {t('upload_header')}</h3>
+        <h3>{t('upload_header')}</h3>
         <p>{t('upload_info')}</p>
         <p><small>{t('supported_formats')}</small></p>
     </div>
     """, unsafe_allow_html=True)
     
-    with st.expander("📄 " + t('supported_formats')):
+    with st.expander(f"📄 {t('supported_formats')}"):
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("**ILP/MILP:**\n" + t('ilp_format_help'))
-            st.markdown("**UFLP:**\n" + t('uflp_format_help'))
+            st.markdown(f"**ILP/MILP:**\n{t('ilp_format_help')}")
+            st.markdown(f"**UFLP:**\n{t('uflp_format_help')}")
         with col2:
-            st.markdown("**MPS:**\n" + t('mps_format_help'))
-            st.markdown("**KoerkelGhosh/gs250a-1:**\n" + t('koerkel_help'))
+            st.markdown(f"**MPS:**\n{t('mps_format_help')}")
+            st.markdown(f"**KoerkelGhosh/gs250a-1:**\n{t('koerkel_help')}")
     
     uploaded_file = st.file_uploader(
         t('choose_file'), 
@@ -1104,7 +1104,7 @@ with tab1:
         st.json(file_details)
         
         if st.button(t('solve_button'), key="solve_upload"):
-            with st.spinner("🔄 " + t('solve_button')):
+            with st.spinner(t('solve_button')):
                 try:
                     text = uploaded_file.getvalue().decode("utf-8", errors='ignore')
                 except:
@@ -1116,7 +1116,7 @@ with tab1:
                     # Problem info
                     st.markdown(f"""
                     <div class="success-box">
-                        <h4>✅ {t('problem_info')}</h4>
+                        <h4>{t('problem_info')}</h4>
                         <p><b>{t('problem_type')}:</b> {detected_type.upper()}</p>
                         <p><b>{t('variables')}:</b> {n}</p>
                         <p><b>{t('constraints')}:</b> {m}</p>
@@ -1171,13 +1171,13 @@ with tab1:
                         st.rerun()
                 
                 except Exception as e:
-                    st.error(f"❌ {t('error')}: {str(e)}")
+                    st.error(f"{t('error')}: {str(e)}")
                     st.code(traceback.format_exc())
 
 with tab2:
     st.markdown(f"""
     <div class="warning-box">
-        <h3>✍️ {t('manual_header')}</h3>
+        <h3>{t('manual_header')}</h3>
         <p>{t('manual_warning')}</p>
     </div>
     """, unsafe_allow_html=True)
@@ -1247,7 +1247,7 @@ with tab2:
         st.session_state.b_man = np.array(b_vals)
     
     if st.button(t('solve_button'), key="solve_manual"):
-        with st.spinner("🔄 " + t('solve_button')):
+        with st.spinner(t('solve_button')):
             try:
                 if is_uflp:
                     f = st.session_state.f_man
@@ -1309,7 +1309,7 @@ with tab2:
                     st.rerun()
             
             except Exception as e:
-                st.error(f"❌ {t('error')}: {str(e)}")
+                st.error(f"{t('error')}: {str(e)}")
                 st.code(traceback.format_exc())
 
 # ------------------- Results Display -------------------
@@ -1320,7 +1320,7 @@ if st.session_state.get('result') is not None:
     
     st.markdown(f"""
     <div class="success-box">
-        <h2>📊 {t('results')}</h2>
+        <h2>{t('results')}</h2>
     </div>
     """, unsafe_allow_html=True)
     
@@ -1385,7 +1385,7 @@ if st.session_state.get('result') is not None:
         """, unsafe_allow_html=True)
     
     if res.get('acceleration_active'):
-        st.success(f"⚡ {t('acceleration_on')}")
+        st.success(t('acceleration_on'))
     
     # Plots
     if res['gap_history']:
@@ -1496,23 +1496,7 @@ st.markdown("---")
 st.markdown(f"""
 <div style="text-align: center; color: #666; padding: 20px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 15px;">
     <p style="font-size: 18px;">{t('footer')}</p>
-    <p style="font-size: 16px;">🔬 AHRH Algorithm - Patented Technology | 📧 {CONTACT_EMAIL} | 📞 {CONTACT_PHONE}</p>
+    <p style="font-size: 16px;">🔬 AHRH Algorithm - Patented Technology | {CONTACT_EMAIL} | {CONTACT_PHONE}</p>
     <p style="font-size: 14px;">© 2024 Zakarya Benregreg. All rights reserved.</p>
 </div>
 """, unsafe_allow_html=True)
-```
-
-هذا البرنامج النهائي يجمع كل الميزات المطلوبة:
-
-1. ✅ **اللوحة الحمراء** لمعلومات الاتصال (في أعلى الصفحة)
-2. ✅ **العنوان الكبير** مع تدرج لوني
-3. ✅ **دعم جميع صيغ الملفات** (ILP, MILP, UFLP, MPS, LP, KoerkelGhosh, gs250a-1)
-4. ✅ **الكشف التلقائي** عن نوع الملف
-5. ✅ **اللوحة الحمراء للتقدم** أثناء الحل (مع تفاصيل ملونة)
-6. ✅ **ثلاثة أنواع من الرسوم البيانية**
-7. ✅ **إيقاف مؤقت واستئناف**
-8. ✅ **حفظ واستعادة الحالة**
-9. ✅ **ثلاث لغات** (عربي/إنجليزي/فرنسي)
-10. ✅ **معايير توقف متعددة**
-11. ✅ **وضع التسريع التلقائي**
-12. ✅ **بطاقات عرض النتائج** مع تأثيرات حركية
