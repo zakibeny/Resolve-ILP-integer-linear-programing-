@@ -2,6 +2,7 @@
 """
 AHRH: حل مسائل البرمجة الصحيحة (ILP/MILP) ومسائل مواقع المرافق (UFLP)
 مع واجهة متعددة اللغات، عرض التقدم، معايير توقف متعددة، وحفظ الحالة
+باستخدام النموذج الموحد (make_problem) ودوال التقييم المقدمة.
 """
 
 import streamlit as st
@@ -16,11 +17,16 @@ import traceback
 import warnings
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import uuid
+import math
+
 warnings.filterwarnings("ignore")
 
 # ------------------- إعدادات -------------------
 NUM_WORKERS = 4
 STATE_FILE = "ahrh_state.json"
+STATE_DIR = "checkpoints"
+os.makedirs(STATE_DIR, exist_ok=True)
 
 # ------------------- ترجمة النصوص -------------------
 translations = {
@@ -28,11 +34,11 @@ translations = {
         'app_title': 'AHRH: حلول البرمجة الصحيحة (ILP/MILP) و UFLP',
         'app_desc': 'تطبيق لحل مسائل البرمجة الصحيحة (ILP) والبرمجة الصحيحة المختلطة (MILP) ومسائل مواقع المرافق (UFLP) باستخدام خوارزمية AHRH.',
         'note_uflp': 'ملاحظة: يتم تحويل مسائل UFLP تلقائياً إلى ILP.',
-        'sidebar_algo': 'معاملات الخوارزمية',
+        'sidebar_algo': '⚙️ معاملات الخوارزمية',
         'max_cycles': 'عدد الدورات الأقصى',
         'k_coarse': 'حجم المجموعة الخشنة (k)',
         'patience': 'الصبر (عدد الدورات بدون تحسن)',
-        'sidebar_stop': 'معايير التوقف',
+        'sidebar_stop': '⏹️ معايير التوقف',
         'choose_criteria': 'اختر مجموعة من الشروط (عند تحقق أي منها تتوقف):',
         'use_R': 'استخدام عتبة R (مع استقرار الفجوة)',
         'R_tol': 'قيمة R الصغرى (ε)',
@@ -43,9 +49,12 @@ translations = {
         'gap_repeat_times': 'عدد مرات التكرار',
         'use_contraction': 'استخدام معيار الانكماش (diff + R)',
         'diff_tol': 'عتبة الفرق بين الحلول (ε₁)',
+        'use_R_stability': 'استخدام استقرار R (التغير النسبي)',
+        'R_stability_tol': 'عتبة التغير النسبي لـ R',
+        'R_stability_cycles': 'عدد دورات استقرار R',
         'workers': 'عدد العمال (للتوازي)',
-        'tab_upload': 'رفع ملف',
-        'tab_manual': 'إدخال يدوي',
+        'tab_upload': '📂 رفع ملف',
+        'tab_manual': '✍️ إدخال يدوي',
         'upload_header': 'رفع ملف المسألة',
         'upload_info': 'يقبل أي ملف نصي ويحاول قراءته تلقائياً (ILP, MILP, UFLP, MPS, LP, gs250a-1)',
         'choose_file': 'اختر ملف المسألة',
@@ -63,8 +72,13 @@ translations = {
         'manual_b': 'الطرف الأيمن b[i]',
         'manual_f': 'تكاليف الفتح f[i]',
         'manual_costs': 'تكاليف النقل c[i][j]',
-        'solve_button': 'حل المسألة',
-        'results': 'النتائج',
+        'manual_constraint_type': 'نوع القيد',
+        'constraint_type_leq': '≤',
+        'constraint_type_eq': '=',
+        'constraint_type_geq': '≥',
+        'solve_button': '🚀 حل المسألة',
+        'results': '📊 النتائج',
+        'problem_info': 'معلومات المسألة',
         'best_cost': 'أفضل تكلفة',
         'lp_val': 'قيمة LP',
         'gap': 'الفجوة (%)',
@@ -73,27 +87,27 @@ translations = {
         'time': 'الزمن (ث)',
         'size': 'الحجم',
         'stop_reason': 'سبب التوقف',
-        'gap_plot': 'تطور الفجوة و R',
+        'gap_plot': '📈 تطور الفجوة و R',
         'gap_label': 'الفجوة',
         'R_label': 'R',
-        'cycle_log': 'سجل الدورات',
+        'cycle_log': '📋 سجل الدورات',
         'cycle': 'دورة',
         'cost': 'التكلفة',
         'improved': 'تحسن',
         'best_so_far': 'أفضل حتى الآن',
         'yes': 'نعم',
         'no': 'لا',
-        'download': 'تحميل التطور',
-        'info_placeholder': 'اختر مصدر المسألة',
+        'download': '📥 تحميل التطور',
+        'info_placeholder': '👈 اختر مصدر المسألة',
         'footer': 'تم التطوير بواسطة Zakarya Benregreg - AHRH خوارزمية محمية ببراءة اختراع',
-        'acceleration_on': 'وضع التسريع مُفعّل',
+        'acceleration_on': '⚡ وضع التسريع مُفعّل',
         'acceleration_off': 'وضع التسريع غير مُفعّل',
-        'save_state': 'تم حفظ الحالة',
-        'resume_state': 'تم العثور على حالة محفوظة',
-        'no_state': 'لا توجد حالة محفوظة',
-        'pause': 'إيقاف مؤقت',
-        'resume': 'استئناف',
-        'paused': 'تم الإيقاف المؤقت',
+        'save_state': '💾 تم حفظ الحالة',
+        'resume_state': '🔄 تم العثور على حالة محفوظة',
+        'no_state': '🆕 لا توجد حالة محفوظة',
+        'pause': '⏸️ إيقاف مؤقت',
+        'resume': '▶️ استئناف',
+        'paused': '⏸️ تم الإيقاف المؤقت',
         'elapsed_time': 'الوقت المنقضي',
         'estimated_remaining': 'الوقت المتبقي',
         'gap_by_cycles': 'الفجوة حسب الدورات',
@@ -111,12 +125,12 @@ translations = {
         'milp': 'برمجة صحيحة مختلطة (MILP)',
         'uflp': 'مسألة مواقع المرافق (UFLP)',
         'select_problem_type': 'اختر نوع المسألة',
-        'contact_info': 'معلومات الاتصال',
+        'contact_info': '📞 معلومات الاتصال',
         'email': 'البريد الإلكتروني',
         'phone': 'الهاتف',
         'fax': 'فاكس',
-        'reset': 'إعادة تعيين',
-        'delete_state': 'حذف الحالة المحفوظة',
+        'reset': '🔄 إعادة تعيين',
+        'delete_state': '🗑️ حذف الحالة المحفوظة',
         'error': 'خطأ',
         'reading_file': 'جاري قراءة الملف...',
         'detecting_format': 'جاري الكشف عن تنسيق الملف...',
@@ -133,24 +147,27 @@ translations = {
         'app_title': 'AHRH: Integer/Mixed-Integer Programming & UFLP Solver',
         'app_desc': 'Solve ILP, MILP, and UFLP problems using the patented AHRH algorithm.',
         'note_uflp': 'Note: UFLP problems are automatically converted to ILP.',
-        'sidebar_algo': 'Algorithm Parameters',
+        'sidebar_algo': '⚙️ Algorithm Parameters',
         'max_cycles': 'Max Cycles',
         'k_coarse': 'Coarse Set Size (k)',
         'patience': 'Patience',
-        'sidebar_stop': 'Stopping Criteria',
+        'sidebar_stop': '⏹️ Stopping Criteria',
         'choose_criteria': 'Choose any combination:',
-        'use_R': 'Use R threshold',
+        'use_R': 'Use R threshold (with gap stability)',
         'R_tol': 'R tolerance (ε)',
         'stable_gap': 'Stable gap cycles',
         'use_cost_repeat': 'Use cost repetition',
         'cost_repeat_times': 'Repetition count',
         'use_gap_repeat': 'Use gap repetition',
         'gap_repeat_times': 'Repetition count',
-        'use_contraction': 'Use contraction criterion',
+        'use_contraction': 'Use contraction criterion (diff + R)',
         'diff_tol': 'Difference tolerance (ε₁)',
+        'use_R_stability': 'Use R relative change stability',
+        'R_stability_tol': 'R relative change tolerance',
+        'R_stability_cycles': 'R stability cycles',
         'workers': 'Workers',
-        'tab_upload': 'Upload File',
-        'tab_manual': 'Manual Input',
+        'tab_upload': '📂 Upload File',
+        'tab_manual': '✍️ Manual Input',
         'upload_header': 'Upload Problem File',
         'upload_info': 'Accepts any text file and tries to read it automatically (ILP, MILP, UFLP, MPS, LP, gs250a-1)',
         'choose_file': 'Choose a file',
@@ -159,7 +176,7 @@ translations = {
         'uflp_format_help': 'UFLP: first line: n m 0, then n lines: f_i + m costs',
         'mps_format_help': 'MPS: Standard MPS format',
         'koerkel_help': 'gs250a-1: Auto-detected',
-        'manual_header': 'Manual ILP Data Entry',
+        'manual_header': 'Manual Problem Data Entry',
         'manual_warning': 'For small problems only (n ≤ 10, m ≤ 10)',
         'manual_n': 'Variables (n)',
         'manual_m': 'Constraints (m)',
@@ -168,8 +185,13 @@ translations = {
         'manual_b': 'Right-hand side b[i]',
         'manual_f': 'Opening costs f[i]',
         'manual_costs': 'Transport costs c[i][j]',
-        'solve_button': 'Solve Problem',
-        'results': 'Results',
+        'manual_constraint_type': 'Constraint type',
+        'constraint_type_leq': '≤',
+        'constraint_type_eq': '=',
+        'constraint_type_geq': '≥',
+        'solve_button': '🚀 Solve Problem',
+        'results': '📊 Results',
+        'problem_info': 'Problem Information',
         'best_cost': 'Best Cost',
         'lp_val': 'LP Value',
         'gap': 'Gap (%)',
@@ -178,27 +200,27 @@ translations = {
         'time': 'Time (s)',
         'size': 'Size',
         'stop_reason': 'Stop Reason',
-        'gap_plot': 'Gap & R Evolution',
+        'gap_plot': '📈 Gap & R Evolution',
         'gap_label': 'Gap',
         'R_label': 'R',
-        'cycle_log': 'Cycle Log',
+        'cycle_log': '📋 Cycle Log',
         'cycle': 'Cycle',
         'cost': 'Cost',
         'improved': 'Improved',
         'best_so_far': 'Best so far',
         'yes': 'Yes',
         'no': 'No',
-        'download': 'Download',
-        'info_placeholder': 'Choose data source',
+        'download': '📥 Download Evolution',
+        'info_placeholder': '👈 Choose data source',
         'footer': 'Developed by Zakarya Benregreg - AHRH patented algorithm',
-        'acceleration_on': 'Acceleration ON',
+        'acceleration_on': '⚡ Acceleration ON',
         'acceleration_off': 'Acceleration OFF',
-        'save_state': 'State saved',
-        'resume_state': 'Found saved state',
-        'no_state': 'No saved state',
-        'pause': 'Pause',
-        'resume': 'Resume',
-        'paused': 'Paused',
+        'save_state': '💾 State saved',
+        'resume_state': '🔄 Found saved state',
+        'no_state': '🆕 No saved state',
+        'pause': '⏸️ Pause',
+        'resume': '▶️ Resume',
+        'paused': '⏸️ Paused',
         'elapsed_time': 'Elapsed Time',
         'estimated_remaining': 'Estimated Remaining',
         'gap_by_cycles': 'Gap by Cycles',
@@ -216,12 +238,12 @@ translations = {
         'milp': 'Mixed-Integer Programming (MILP)',
         'uflp': 'Facility Location (UFLP)',
         'select_problem_type': 'Select Problem Type',
-        'contact_info': 'Contact Information',
+        'contact_info': '📞 Contact Information',
         'email': 'Email',
         'phone': 'Phone',
         'fax': 'Fax',
-        'reset': 'Reset',
-        'delete_state': 'Delete Saved State',
+        'reset': '🔄 Reset',
+        'delete_state': '🗑️ Delete Saved State',
         'error': 'Error',
         'reading_file': 'Reading file...',
         'detecting_format': 'Detecting file format...',
@@ -238,24 +260,27 @@ translations = {
         'app_title': 'AHRH: Solveur PLNE/PLMNE et UFLP',
         'app_desc': 'Résoudre des problèmes PLNE, PLMNE et UFLP avec l\'algorithme AHRH breveté.',
         'note_uflp': 'Note: Les problèmes UFLP sont convertis automatiquement en PLNE.',
-        'sidebar_algo': 'Paramètres',
+        'sidebar_algo': '⚙️ Paramètres',
         'max_cycles': 'Cycles max',
         'k_coarse': 'Taille ensemble grossier (k)',
         'patience': 'Patience',
-        'sidebar_stop': "Critères d'arrêt",
+        'sidebar_stop': '⏹️ Critères d\'arrêt',
         'choose_criteria': 'Choisissez une combinaison:',
-        'use_R': 'Utiliser seuil R',
+        'use_R': 'Utiliser seuil R (avec stabilité de l\'écart)',
         'R_tol': 'Tolérance R (ε)',
-        'stable_gap': 'Cycles stables',
-        'use_cost_repeat': 'Répétition coût',
-        'cost_repeat_times': 'Nombre répétitions',
-        'use_gap_repeat': 'Répétition écart',
-        'gap_repeat_times': 'Nombre répétitions',
-        'use_contraction': 'Critère contraction',
-        'diff_tol': 'Tolérance différence (ε₁)',
+        'stable_gap': 'Cycles de stabilité de l\'écart',
+        'use_cost_repeat': 'Répétition du coût',
+        'cost_repeat_times': 'Nombre de répétitions',
+        'use_gap_repeat': 'Répétition de l\'écart',
+        'gap_repeat_times': 'Nombre de répétitions',
+        'use_contraction': 'Critère de contraction (diff + R)',
+        'diff_tol': 'Tolérance de différence (ε₁)',
+        'use_R_stability': 'Stabilité du changement relatif de R',
+        'R_stability_tol': 'Tolérance du changement relatif',
+        'R_stability_cycles': 'Cycles de stabilité',
         'workers': 'Travailleurs',
-        'tab_upload': 'Fichier',
-        'tab_manual': 'Saisie',
+        'tab_upload': '📂 Fichier',
+        'tab_manual': '✍️ Saisie',
         'upload_header': 'Charger fichier',
         'upload_info': 'Accepte tout fichier texte et essaie de le lire automatiquement (ILP, MILP, UFLP, MPS, LP, gs250a-1)',
         'choose_file': 'Choisir fichier',
@@ -264,51 +289,56 @@ translations = {
         'uflp_format_help': 'UFLP: 1ère ligne: n m 0, puis n lignes: f_i + m coûts',
         'mps_format_help': 'MPS: Format MPS standard',
         'koerkel_help': 'gs250a-1: Auto-détecté',
-        'manual_header': 'Saisie manuelle',
-        'manual_warning': 'Petits problèmes seulement (n ≤ 10, m ≤ 10)',
+        'manual_header': 'Saisie manuelle des données',
+        'manual_warning': 'Pour petits problèmes seulement (n ≤ 10, m ≤ 10)',
         'manual_n': 'Variables (n)',
         'manual_m': 'Contraintes (m)',
-        'manual_c': 'Coefficients c[i]',
-        'manual_A': 'Matrice A[i][j]',
+        'manual_c': 'Coefficients objectifs c[i]',
+        'manual_A': 'Matrice des contraintes A[i][j]',
         'manual_b': 'Second membre b[i]',
-        'manual_f': "Coûts d'ouverture f[i]",
-        'manual_costs': 'Coûts transport c[i][j]',
-        'solve_button': 'Résoudre',
-        'results': 'Résultats',
+        'manual_f': 'Coûts d\'ouverture f[i]',
+        'manual_costs': 'Coûts de transport c[i][j]',
+        'manual_constraint_type': 'Type de contrainte',
+        'constraint_type_leq': '≤',
+        'constraint_type_eq': '=',
+        'constraint_type_geq': '≥',
+        'solve_button': '🚀 Résoudre',
+        'results': '📊 Résultats',
+        'problem_info': 'Information',
         'best_cost': 'Meilleur coût',
         'lp_val': 'Valeur LP',
         'gap': 'Écart (%)',
         'open_fac': 'Sites ouverts',
-        'cycles_done': 'Cycles',
+        'cycles_done': 'Cycles effectués',
         'time': 'Temps (s)',
         'size': 'Taille',
-        'stop_reason': "Raison d'arrêt",
-        'gap_plot': 'Évolution',
+        'stop_reason': 'Raison d\'arrêt',
+        'gap_plot': '📈 Évolution',
         'gap_label': 'Écart',
         'R_label': 'R',
-        'cycle_log': 'Journal',
+        'cycle_log': '📋 Journal',
         'cycle': 'Cycle',
         'cost': 'Coût',
         'improved': 'Amélioré',
-        'best_so_far': 'Meilleur',
+        'best_so_far': 'Meilleur jusqu\'à présent',
         'yes': 'Oui',
         'no': 'Non',
-        'download': 'Télécharger',
-        'info_placeholder': 'Choisissez source',
+        'download': '📥 Télécharger',
+        'info_placeholder': '👈 Choisissez source',
         'footer': 'Développé par Zakarya Benregreg - Algorithme AHRH breveté',
-        'acceleration_on': 'Mode accélération',
+        'acceleration_on': '⚡ Mode accélération',
         'acceleration_off': 'Mode normal',
-        'save_state': 'État sauvegardé',
-        'resume_state': 'État trouvé',
-        'no_state': "Pas d'état",
-        'pause': 'Pause',
-        'resume': 'Reprendre',
-        'paused': 'En pause',
+        'save_state': '💾 État sauvegardé',
+        'resume_state': '🔄 État trouvé',
+        'no_state': '🆕 Pas d\'état',
+        'pause': '⏸️ Pause',
+        'resume': '▶️ Reprendre',
+        'paused': '⏸️ En pause',
         'elapsed_time': 'Temps écoulé',
-        'estimated_remaining': 'Temps restant',
+        'estimated_remaining': 'Temps restant estimé',
         'gap_by_cycles': 'Écart par cycles',
         'gap_by_R': 'Écart par R',
-        'convergence_plot': 'Graphique convergence',
+        'convergence_plot': 'Graphique de convergence',
         'cycles_vs_gap': 'Cycles vs Écart',
         'R_vs_gap': 'R vs Écart',
         'vs': 'vs',
@@ -321,12 +351,12 @@ translations = {
         'milp': 'PLMNE',
         'uflp': 'UFLP',
         'select_problem_type': 'Choisir type',
-        'contact_info': 'Contact',
+        'contact_info': '📞 Contact',
         'email': 'Email',
         'phone': 'Téléphone',
         'fax': 'Fax',
-        'reset': 'Réinitialiser',
-        'delete_state': "Supprimer l'état",
+        'reset': '🔄 Réinitialiser',
+        'delete_state': '🗑️ Supprimer l\'état',
         'error': 'Erreur',
         'reading_file': 'Lecture du fichier...',
         'detecting_format': 'Détection du format...',
@@ -344,85 +374,315 @@ translations = {
 def t(key):
     return translations[st.session_state.language][key]
 
+# ------------------- إدارة الجلسة -------------------
 if 'language' not in st.session_state:
     st.session_state.language = 'English'
 if 'paused' not in st.session_state:
     st.session_state.paused = False
 if 'stop_requested' not in st.session_state:
     st.session_state.stop_requested = False
+if 'issue_token' not in st.session_state:
+    # Générer un token unique pour cette session
+    st.session_state.issue_token = str(uuid.uuid4())
+
+def ensure_issue_token():
+    if 'issue_token' not in st.session_state:
+        st.session_state.issue_token = str(uuid.uuid4())
+    return st.session_state.issue_token
 
 # ------------------- معلومات الاتصال -------------------
 CONTACT_EMAIL = "zakibeny@gmail.com"
 CONTACT_PHONE = "0021355614305 / 00213779679073"
 CONTACT_FAX = "036495241"
 
-# ------------------- UFLP to ILP Conversion -------------------
-def uflp_to_ilp(f, c):
-    n = len(f)
-    m = c.shape[1]
-    n_vars = n + n * m
-    obj = np.zeros(n_vars)
-    obj[:n] = f
-    obj[n:] = c.flatten()
-    n_constraints = m + n * m
-    A = np.zeros((n_constraints, n_vars))
-    b = np.zeros(n_constraints)
-    for j in range(m):
-        for i in range(n):
-            A[j, n + i*m + j] = 1
-        b[j] = 1
-    for i in range(n):
-        for j in range(m):
-            idx = m + i*m + j
-            A[idx, n + i*m + j] = 1
-            A[idx, i] = -1
-            b[idx] = 0
-    return obj, A, b, n_vars, n_constraints, n
+# =========================
+# 1) نموذج داخلي موحّد (من المستخدم)
+# =========================
+def make_problem(obj, A, b, senses, var_types, lb=None, ub=None,
+                 original_type="ILP", meta=None):
+    obj = np.asarray(obj, dtype=float).reshape(-1)
+    A = np.asarray(A, dtype=float)
+    b = np.asarray(b, dtype=float).reshape(-1)
 
-# ------------------- Solution Evaluation -------------------
-def evaluate_solution(x, obj, A, b, uflp_info=None):
-    if uflp_info is not None:
-        n_y = uflp_info['n_y']
-        f = uflp_info['f']
-        c = uflp_info['c']
-        y = np.round(x[:n_y]).astype(int)
-        open_fac = np.where(y > 0.5)[0]
-        if len(open_fac) == 0:
-            return float('inf')
-        total = np.sum(f[open_fac])
-        for j in range(c.shape[1]):
-            total += np.min(c[open_fac, j])
-        return total
-    else:
-        x_int = np.round(x).astype(int)
-        x_int = np.maximum(x_int, 0)
-        if np.all(A @ x_int <= b + 1e-6):
-            return obj @ x_int
-        return float('inf')
-
-def lp_relaxation(obj, A, b):
     n = len(obj)
     m = len(b)
-    prob = pulp.LpProblem("LP_Relax", pulp.LpMinimize)
-    x = [pulp.LpVariable(f"x_{i}", lowBound=0, cat='Continuous') for i in range(n)]
-    prob += pulp.lpSum(obj[i] * x[i] for i in range(n))
+
+    if A.shape != (m, n):
+        raise ValueError(f"A shape must be ({m}, {n}), got {A.shape}")
+    if len(senses) != m:
+        raise ValueError("senses length must equal number of constraints")
+    if len(var_types) != n:
+        raise ValueError("var_types length must equal number of variables")
+
+    lb = np.zeros(n, dtype=float) if lb is None else np.asarray(lb, dtype=float).reshape(-1)
+    if ub is None:
+        ub = np.array([1.0 if vt == "B" else np.inf for vt in var_types], dtype=float)
+    else:
+        ub = np.asarray(ub, dtype=float).reshape(-1)
+
+    return {
+        "obj": obj,
+        "A": A,
+        "b": b,
+        "senses": list(senses),        # <=, >=, =
+        "var_types": list(var_types),  # B, I, C
+        "lb": lb,
+        "ub": ub,
+        "original_type": original_type,
+        "meta": meta or {},
+    }
+
+def uflp_to_ilp(f, c):
+    """
+    UFLP -> ILP canonical model
+    y_i : open facility i   (binary)
+    x_ij: customer j assigned to facility i (binary)
+    min sum f_i y_i + sum c_ij x_ij
+    s.t. sum_i x_ij = 1      for each customer j
+         x_ij - y_i <= 0     for each i,j
+    """
+    f = np.asarray(f, dtype=float).reshape(-1)
+    c = np.asarray(c, dtype=float)
+    n = len(f)          # facilities
+    m = c.shape[1]      # customers
+
+    n_vars = n + n * m
+    obj = np.concatenate([f, c.reshape(-1)])
+
+    A = []
+    b = []
+    senses = []
+
+    # assignment constraints: each customer assigned exactly once
     for j in range(m):
-        prob += pulp.lpSum(A[j][i] * x[i] for i in range(n)) <= b[j]
+        row = np.zeros(n_vars, dtype=float)
+        for i in range(n):
+            row[n + i * m + j] = 1.0
+        A.append(row)
+        b.append(1.0)
+        senses.append("=")
+
+    # linking constraints: x_ij <= y_i
+    for i in range(n):
+        for j in range(m):
+            row = np.zeros(n_vars, dtype=float)
+            row[n + i * m + j] = 1.0
+            row[i] = -1.0
+            A.append(row)
+            b.append(0.0)
+            senses.append("<=")
+
+    var_types = ["B"] * n_vars
+    lb = np.zeros(n_vars, dtype=float)
+    ub = np.ones(n_vars, dtype=float)
+
+    return make_problem(
+        obj=obj,
+        A=np.array(A),
+        b=np.array(b),
+        senses=senses,
+        var_types=var_types,
+        lb=lb,
+        ub=ub,
+        original_type="UFLP",
+        meta={"n_facilities": n, "n_customers": m},
+    )
+
+# =========================
+# 2) تقييم عام صحيح لـ ILP/MILP/UFLP
+# =========================
+def _is_discrete(vt):
+    return vt in ("B", "I")
+
+def _bound_or_none(v):
+    return None if not np.isfinite(v) else float(v)
+
+def _sanitize_value(v, lo, hi, vartype):
+    if vartype == "B":
+        return float(int(np.clip(np.round(v), 0, 1)))
+    if vartype == "I":
+        lo2 = -1e18 if not np.isfinite(lo) else lo
+        hi2 =  1e18 if not np.isfinite(hi) else hi
+        return float(int(np.clip(np.round(v), lo2, hi2)))
+    # Continuous
+    lo2 = -1e18 if not np.isfinite(lo) else lo
+    hi2 =  1e18 if not np.isfinite(hi) else hi
+    return float(np.clip(v, lo2, hi2))
+
+def _add_constraint(prob, expr, sense, rhs):
+    if sense == "<=":
+        prob += expr <= rhs
+    elif sense == ">=":
+        prob += expr >= rhs
+    elif sense == "=":
+        prob += expr == rhs
+    else:
+        raise ValueError(f"Unknown constraint sense: {sense}")
+
+def _check_feasibility_numeric(x, problem, tol=1e-7):
+    lhs = problem["A"] @ x
+    for j, sense in enumerate(problem["senses"]):
+        rhs = problem["b"][j]
+        if sense == "<=" and lhs[j] > rhs + tol:
+            return False
+        if sense == ">=" and lhs[j] < rhs - tol:
+            return False
+        if sense == "=" and abs(lhs[j] - rhs) > tol:
+            return False
+    return True
+
+def evaluate_solution(x, problem, tol=1e-7):
+    """
+    - للمتغيرات B/I: تثبيت بالتقريب والقص على الحدود.
+    - للمتغيرات C في MILP: نعيد حل الجزء المستمر ببرنامج خطي بعد تثبيت الجزء المتقطع.
+    """
+    x = np.asarray(x, dtype=float).reshape(-1)
+    n = len(problem["obj"])
+
+    if len(x) != n:
+        raise ValueError("Candidate vector has wrong size")
+
+    vt = problem["var_types"]
+    lb = problem["lb"]
+    ub = problem["ub"]
+    obj = problem["obj"]
+
+    fixed_vals = [None] * n
+    cont_idx = []
+
+    for i in range(n):
+        if _is_discrete(vt[i]):
+            fixed_vals[i] = _sanitize_value(x[i], lb[i], ub[i], vt[i])
+        else:
+            cont_idx.append(i)
+
+    # Pure ILP / pure binary path
+    if not cont_idx:
+        x_full = np.array(fixed_vals, dtype=float)
+        if not _check_feasibility_numeric(x_full, problem, tol=tol):
+            return float("inf"), None
+        return float(obj @ x_full), x_full
+
+    # MILP path: discrete vars fixed, continuous vars re-optimized
+    prob = pulp.LpProblem("MILP_EVAL", pulp.LpMinimize)
+    vars_lp = []
+
+    for i in range(n):
+        if _is_discrete(vt[i]):
+            vars_lp.append(fixed_vals[i])
+        else:
+            vars_lp.append(
+                pulp.LpVariable(
+                    f"x_{i}",
+                    lowBound=_bound_or_none(lb[i]),
+                    upBound=_bound_or_none(ub[i]),
+                    cat="Continuous"
+                )
+            )
+
+    prob += pulp.lpSum(obj[i] * vars_lp[i] for i in range(n))
+
+    for j, sense in enumerate(problem["senses"]):
+        expr = pulp.lpSum(problem["A"][j, i] * vars_lp[i] for i in range(n))
+        _add_constraint(prob, expr, sense, float(problem["b"][j]))
+
     solver = pulp.PULP_CBC_CMD(msg=False)
     prob.solve(solver)
-    if prob.status == pulp.LpStatusOptimal:
-        x_val = np.array([pulp.value(x[i]) for i in range(n)])
-        obj_val = pulp.value(prob.objective)
-        return x_val, obj_val
-    return None, None
 
-# ------------------- Algorithm Core Functions -------------------
-def compute_R(y):
-    return np.max(np.minimum(y, 1 - y))
+    if prob.status != pulp.LpStatusOptimal:
+        return float("inf"), None
 
-def get_fractional_indices(y, eps=0.01):
-    return np.where((y > eps) & (y < 1 - eps))[0]
+    x_full = np.array([
+        float(vars_lp[i]) if _is_discrete(vt[i]) else float(pulp.value(vars_lp[i]))
+        for i in range(n)
+    ], dtype=float)
 
+    return float(pulp.value(prob.objective)), x_full
+
+def lp_relaxation(problem):
+    """
+    Relax all B/I vars to Continuous, while respecting:
+    - bounds
+    - senses <= >= =
+    """
+    n = len(problem["obj"])
+    m = len(problem["b"])
+
+    prob = pulp.LpProblem("LP_Relax", pulp.LpMinimize)
+    x = [
+        pulp.LpVariable(
+            f"x_{i}",
+            lowBound=_bound_or_none(problem["lb"][i]),
+            upBound=_bound_or_none(problem["ub"][i]),
+            cat="Continuous"
+        )
+        for i in range(n)
+    ]
+
+    prob += pulp.lpSum(problem["obj"][i] * x[i] for i in range(n))
+
+    for j in range(m):
+        expr = pulp.lpSum(problem["A"][j, i] * x[i] for i in range(n))
+        _add_constraint(prob, expr, problem["senses"][j], float(problem["b"][j]))
+
+    solver = pulp.PULP_CBC_CMD(msg=False)
+    prob.solve(solver)
+
+    if prob.status != pulp.LpStatusOptimal:
+        return None, None
+
+    x_val = np.array([float(pulp.value(x[i])) for i in range(n)], dtype=float)
+    obj_val = float(pulp.value(prob.objective))
+    return x_val, obj_val
+
+# =========================
+# 3) الكسور و R يجب أن تعمل على B/I فقط
+# =========================
+def get_fractional_indices(x, problem, eps=1e-6):
+    x = np.asarray(x, dtype=float)
+    idx = []
+    for i, vt in enumerate(problem["var_types"]):
+        if vt in ("B", "I"):
+            if abs(x[i] - np.round(x[i])) > eps:
+                idx.append(i)
+    return np.array(idx, dtype=int)
+
+def compute_R(x, problem):
+    x = np.asarray(x, dtype=float)
+    vals = []
+    for i, vt in enumerate(problem["var_types"]):
+        if vt in ("B", "I"):
+            vals.append(abs(x[i] - np.round(x[i])))
+    return max(vals) if vals else 0.0
+
+def local_search(x, best_cost, problem):
+    x = np.asarray(x, dtype=float).copy()
+    best_x = x.copy()
+    best = best_cost
+
+    for i, vt in enumerate(problem["var_types"]):
+        candidates = []
+
+        if vt == "B":
+            candidates = [1.0 - round(best_x[i])]
+        elif vt == "I":
+            candidates = [best_x[i] - 1.0, best_x[i] + 1.0]
+        else:
+            continue  # لا نقلب المتغيرات المستمرة هنا
+
+        for cand in candidates:
+            x_new = best_x.copy()
+            x_new[i] = _sanitize_value(cand, problem["lb"][i], problem["ub"][i], vt)
+            cost, x_feas = evaluate_solution(x_new, problem)
+            if cost < best and x_feas is not None:
+                best = cost
+                best_x = x_feas.copy()
+
+    return best, best_x
+
+# =========================
+# 4) دوال المسح الشعاعي و V‑cycle (معدلة لاستخدام problem)
+# =========================
 def generate_biased_directions(x_lp, frac_idx, count, alpha, bias_strength=0.5):
     n_free = len(frac_idx)
     if x_lp is None or n_free == 0:
@@ -444,7 +704,7 @@ def generate_biased_directions(x_lp, frac_idx, count, alpha, bias_strength=0.5):
         dirs.append(u)
     return np.array(dirs)
 
-def hierarchical_radial_scan(x_center, R_val, frac_idx, obj, A, b, best_cost, best_x, x_lp=None, uflp_info=None):
+def hierarchical_radial_scan(x_center, R_val, frac_idx, problem, best_cost, best_x, x_lp=None):
     if len(frac_idx) == 0:
         return best_cost, best_x
     x_frac = x_center[frac_idx].copy()
@@ -460,29 +720,16 @@ def hierarchical_radial_scan(x_center, R_val, frac_idx, obj, A, b, best_cost, be
             x_cand_int = np.maximum(x_cand_int, 0)
             x_full = x_center.copy()
             x_full[frac_idx] = x_cand_int
-            cost = evaluate_solution(x_full, obj, A, b, uflp_info)
-            if cost < local_best:
+            cost, x_feas = evaluate_solution(x_full, problem)
+            if cost < local_best and x_feas is not None:
                 local_best = cost
-                local_best_x = x_full.copy()
+                local_best_x = x_feas.copy()
     return local_best, local_best_x
 
-def local_search(x, best_cost, obj, A, b, uflp_info=None):
-    n = len(x)
-    best_x = x.copy()
-    best = best_cost
-    for i in range(n):
-        x_new = best_x.copy()
-        x_new[i] = 1 - x_new[i]
-        cost = evaluate_solution(x_new, obj, A, b, uflp_info)
-        if cost < best:
-            best = cost
-            best_x = x_new
-    return best, best_x
-
-def vcycle(x, obj, A, b, coarse, x_lp, best_cost, uflp_info=None):
-    frac_idx = get_fractional_indices(x)
-    R_val = compute_R(x)
-    new_cost, new_x = hierarchical_radial_scan(x, R_val, frac_idx, obj, A, b, best_cost, x, x_lp, uflp_info)
+def vcycle(x, problem, coarse, x_lp, best_cost):
+    frac_idx = get_fractional_indices(x, problem)
+    R_val = compute_R(x, problem)
+    new_cost, new_x = hierarchical_radial_scan(x, R_val, frac_idx, problem, best_cost, x, x_lp)
     if new_cost < best_cost:
         best_cost = new_cost
         x = new_x
@@ -494,15 +741,91 @@ def vcycle(x, obj, A, b, coarse, x_lp, best_cost, uflp_info=None):
             x_full = x.copy()
             for idx, val in zip(coarse, xc):
                 x_full[idx] = val
-            cost = evaluate_solution(x_full, obj, A, b, uflp_info)
-            if cost < best_coarse:
+            cost, x_feas = evaluate_solution(x_full, problem)
+            if cost < best_coarse and x_feas is not None:
                 best_coarse = cost
-                best_x_coarse = x_full
+                best_x_coarse = x_feas
         if best_coarse < best_cost:
             best_cost = best_coarse
             x = best_x_coarse
-    best_cost, x = local_search(x, best_cost, obj, A, b, uflp_info)
+    best_cost, x = local_search(x, best_cost, problem)
     return best_cost, x
+
+# =========================
+# 5) حفظ checkpoint مع issue_token
+# =========================
+def _json_safe_value(v):
+    if isinstance(v, (np.floating, float)):
+        return None if not np.isfinite(v) else float(v)
+    if isinstance(v, (np.integer, int)):
+        return int(v)
+    return v
+
+def _json_safe_array(a):
+    return [_json_safe_value(v) for v in np.asarray(a).tolist()]
+
+def serialize_problem(problem):
+    return {
+        "obj": _json_safe_array(problem["obj"]),
+        "A": [_json_safe_array(row) for row in np.asarray(problem["A"])],
+        "b": _json_safe_array(problem["b"]),
+        "senses": list(problem["senses"]),
+        "var_types": list(problem["var_types"]),
+        "lb": _json_safe_array(problem["lb"]),
+        "ub": _json_safe_array(problem["ub"]),
+        "original_type": problem["original_type"],
+        "meta": problem["meta"],
+    }
+
+def build_checkpoint(problem, runtime_info=None):
+    ensure_issue_token()
+    return {
+        "issue_token": st.session_state.issue_token,
+        "saved_at": datetime.utcnow().isoformat() + "Z",
+        "language": st.session_state.get("language", "English"),
+        "problem": serialize_problem(problem),
+        "runtime_info": runtime_info or {},
+    }
+
+def save_checkpoint_local(state):
+    path = os.path.join(STATE_DIR, f"ahrh_{state['issue_token']}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+    return path
+
+# ------------------- State Management (Legacy) -------------------
+def save_state(filename, cycle, best_cost, best_x, history, lp_val, total_time, problem_data):
+    # نحتفظ بالحالة القديمة للتوافق، ولكن نضيفها إلى checkpoint الجديد
+    runtime_info = {
+        'cycle': cycle,
+        'best_cost': best_cost,
+        'best_x': best_x.tolist(),
+        'history': history,
+        'lp_val': lp_val,
+        'total_time': total_time,
+    }
+    checkpoint = build_checkpoint(problem_data.get('problem'), runtime_info)
+    # نستخدم اسم ملف موحّد
+    with open(filename, 'w') as f:
+        json.dump(checkpoint, f)
+
+def load_state(filename):
+    if os.path.exists(filename):
+        with open(filename, 'r') as f:
+            state = json.load(f)
+        # نحاول استخراج best_x من runtime_info
+        if 'runtime_info' in state and 'best_x' in state['runtime_info']:
+            state['best_x'] = np.array(state['runtime_info']['best_x'])
+        else:
+            return None
+        return state
+    return None
+
+def delete_state(filename):
+    if os.path.exists(filename):
+        os.remove(filename)
+        return True
+    return False
 
 # ------------------- Multi-format File Reading -------------------
 def try_read_as_gs250a(text):
@@ -549,7 +872,11 @@ def try_read_as_gs250a(text):
         else:
             return None
         
-        return c, A, b, n, m
+        # نصنع problem من النوع ILP (افتراض أن القيود ≤ والمتغيرات صحيحة)
+        senses = ['<='] * m
+        var_types = ['I'] * n
+        problem = make_problem(c, A, b, senses, var_types)
+        return problem, 'gs250a'
     except:
         return None
 
@@ -588,7 +915,8 @@ def try_read_as_uflp(text):
             else:
                 return None
         
-        return f, c, n, m
+        problem = uflp_to_ilp(f, c)
+        return problem, 'uflp'
     except:
         return None
 
@@ -613,106 +941,122 @@ def try_read_as_ilp(text):
         if n <= 0 or m <= 0 or n > 1000 or m > 1000:
             return None
         
-        c = np.array(list(map(float, clean_lines[1].split())))
-        if len(c) != n:
+        # محاولة قراءة c (قد تكون في عدة أسطر)
+        c_vals = []
+        idx = 1
+        while len(c_vals) < n and idx < len(clean_lines):
+            c_vals.extend(list(map(float, clean_lines[idx].split())))
+            idx += 1
+        if len(c_vals) < n:
             return None
+        c = np.array(c_vals[:n])
         
+        # قراءة A
         A = np.zeros((m, n))
         for i in range(m):
-            if 2+i >= len(clean_lines):
+            if idx >= len(clean_lines):
                 return None
-            row = list(map(float, clean_lines[2+i].split()))
-            if len(row) != n:
+            row_vals = list(map(float, clean_lines[idx].split()))
+            if len(row_vals) < n:
+                # قد يمتد السطر
+                while len(row_vals) < n and idx+1 < len(clean_lines):
+                    idx += 1
+                    row_vals.extend(list(map(float, clean_lines[idx].split())))
+            if len(row_vals) >= n:
+                A[i] = row_vals[:n]
+                idx += 1
+            else:
                 return None
-            A[i] = row
         
-        if 2+m >= len(clean_lines):
+        # قراءة b
+        if idx < len(clean_lines):
+            b_vals = list(map(float, clean_lines[idx].split()))
+        else:
             return None
-        b = np.array(list(map(float, clean_lines[2+m].split())))
-        if len(b) != m:
+        if len(b_vals) < m:
+            # قد يمتد
+            while len(b_vals) < m and idx+1 < len(clean_lines):
+                idx += 1
+                b_vals.extend(list(map(float, clean_lines[idx].split())))
+        if len(b_vals) >= m:
+            b = np.array(b_vals[:m])
+        else:
             return None
         
-        return c, A, b, n, m
+        # نفترض أن القيود من نوع ≤ والمتغيرات صحيحة
+        senses = ['<='] * m
+        var_types = ['I'] * n
+        problem = make_problem(c, A, b, senses, var_types)
+        return problem, 'ilp'
     except:
         return None
 
-def flexible_file_reader(text):
+def flexible_file_reader(text, filename=""):
     """محاولة قراءة الملف بكل الصيغ الممكنة"""
     
     # محاولة gs250a-1 أولاً
     with st.spinner(t('trying_gs250a')):
         result = try_read_as_gs250a(text)
         if result is not None:
-            c, A, b, n, m = result
-            return c, A, b, n, m, None, 'gs250a'
+            problem, detected_type = result
+            st.success(f"{t('success')}: {detected_type}")
+            return problem, detected_type
     
     # محاولة UFLP
     with st.spinner(t('trying_uflp')):
         result = try_read_as_uflp(text)
         if result is not None:
-            f, c, n, m = result
-            obj, A, b, n_vars, n_constraints, n_y = uflp_to_ilp(f, c)
-            uflp_info = {'n_y': n_y, 'f': f, 'c': c}
-            return obj, A, b, n, m, uflp_info, 'uflp'
+            problem, detected_type = result
+            st.success(f"{t('success')}: {detected_type}")
+            return problem, detected_type
     
     # محاولة ILP
     with st.spinner(t('trying_ilp')):
         result = try_read_as_ilp(text)
         if result is not None:
-            c, A, b, n, m = result
-            return c, A, b, n, m, None, 'ilp'
+            problem, detected_type = result
+            st.success(f"{t('success')}: {detected_type}")
+            return problem, detected_type
     
     # إذا فشلت كل المحاولات
     raise ValueError(t('failed'))
 
-# ------------------- State Management -------------------
-def save_state(filename, cycle, best_cost, best_x, history, lp_val, total_time, problem_data):
-    state = {
-        'cycle': cycle,
-        'best_cost': best_cost,
-        'best_x': best_x.tolist(),
-        'history': history,
-        'lp_val': lp_val,
-        'total_time': total_time,
-        'problem_data': problem_data,
-        'timestamp': datetime.now().isoformat()
-    }
-    with open(filename, 'w') as f:
-        json.dump(state, f)
-
-def load_state(filename):
-    if os.path.exists(filename):
-        with open(filename, 'r') as f:
-            state = json.load(f)
-        state['best_x'] = np.array(state['best_x'])
-        return state
-    return None
-
-def delete_state(filename):
-    if os.path.exists(filename):
-        os.remove(filename)
-        return True
-    return False
-
-# ------------------- Main Solving Function -------------------
-def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
+# ------------------- Main Solving Function (معادلة للـ problem) -------------------
+def solve_ahrh(problem, max_cycles, k_coarse, patience,
                use_R, R_tol, stable_gap_needed,
                use_cost_repeat, cost_repeat_times,
                use_gap_repeat, gap_repeat_times,
-               use_contraction, diff_tol, resume=False):
+               use_contraction, diff_tol,
+               use_R_stability, R_stability_tol, R_stability_cycles,
+               resume=False):
     
-    n = len(obj)
-    x_lp, lp_val = lp_relaxation(obj, A, b)
+    n = len(problem["obj"])
+    x_lp, lp_val = lp_relaxation(problem)
     if x_lp is None:
         lp_val = float('inf')
     
     if not resume:
+        # حل ابتدائي: تقريب حل LP مع ضمان الجدوى
         x = np.round(x_lp).astype(int) if x_lp is not None else np.zeros(n, dtype=int)
-        x = np.maximum(x, 0)
-        best_cost = evaluate_solution(x, obj, A, b, uflp_info)
-        if best_cost == float('inf'):
+        x = np.clip(x, problem["lb"], problem["ub"])
+        best_cost, x = evaluate_solution(x, problem)
+        if best_cost == float('inf') or x is None:
+            # حاول بحل الصفري
             x = np.zeros(n, dtype=int)
-            best_cost = evaluate_solution(x, obj, A, b, uflp_info)
+            best_cost, x = evaluate_solution(x, problem)
+        if best_cost == float('inf') or x is None:
+            # حاول بحل عشوائي
+            for _ in range(10):
+                x_rand = np.random.uniform(problem["lb"], problem["ub"])
+                x_rand = np.round(x_rand).astype(int)
+                cost, xr = evaluate_solution(x_rand, problem)
+                if cost < best_cost:
+                    best_cost = cost
+                    x = xr
+        if best_cost == float('inf') or x is None:
+            st.error("لا يمكن إيجاد حل ابتدائي مجدٍ.")
+            return None
+        
         history = []
         total_time = 0.0
         start_cycle = 1
@@ -721,22 +1065,22 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
         if state is None:
             st.warning(t('no_state'))
             x = np.round(x_lp).astype(int) if x_lp is not None else np.zeros(n, dtype=int)
-            x = np.maximum(x, 0)
-            best_cost = evaluate_solution(x, obj, A, b, uflp_info)
-            if best_cost == float('inf'):
+            x = np.clip(x, problem["lb"], problem["ub"])
+            best_cost, x = evaluate_solution(x, problem)
+            if best_cost == float('inf') or x is None:
                 x = np.zeros(n, dtype=int)
-                best_cost = evaluate_solution(x, obj, A, b, uflp_info)
+                best_cost, x = evaluate_solution(x, problem)
             history = []
             total_time = 0.0
             start_cycle = 1
         else:
             st.info(t('resume_state'))
-            start_cycle = state['cycle'] + 1
-            best_cost = state['best_cost']
-            x = state['best_x']
-            history = state['history']
-            total_time = state['total_time']
-            lp_val = state['lp_val']
+            start_cycle = state['runtime_info']['cycle'] + 1
+            best_cost = state['runtime_info']['best_cost']
+            x = np.array(state['runtime_info']['best_x'])
+            history = state['runtime_info']['history']
+            total_time = state['runtime_info']['total_time']
+            lp_val = state['runtime_info']['lp_val']
 
     cycles_log = []
     gap_history = []
@@ -749,6 +1093,7 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
     cost_repeat_count = 0
     gap_repeat_count = 0
     stable_gap_count = 0
+    r_stable_count = 0
     last_cost = None
     last_gap = None
     last_R = None
@@ -782,8 +1127,11 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
                     st.session_state.paused = False
                     break
             
+            # اختيار المجموعة الخشنة
             if x_lp is not None:
+                # نأخذ المتغيرات المفتوحة حالياً (أكبر من 0.5)
                 open_now = np.where(x > 0.5)[0].tolist()
+                # وأيضاً أهم المتغيرات في حل LP
                 top_lp = np.argsort(-x_lp)[:k_coarse].tolist()
                 coarse = list(set(open_now + top_lp))
                 if len(coarse) > 10:
@@ -798,9 +1146,14 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
             else:
                 st.session_state.acceleration = False
             
-            new_cost, new_x = vcycle(x, obj, A, b, coarse, x_lp, best_cost, uflp_info)
+            new_cost, new_x = vcycle(x, problem, coarse, x_lp, best_cost)
+            if new_cost == float('inf') or new_x is None:
+                # إذا فشلت الدورة V، نبقى على الحل السابق
+                new_cost = best_cost
+                new_x = x.copy()
+            
             gap = (new_cost - lp_val) / lp_val * 100 if lp_val not in [0, float('inf')] else 0
-            R_val = compute_R(new_x)
+            R_val = compute_R(new_x, problem)
             diff = np.linalg.norm(new_x - last_x)
             improved = new_cost < best_cost - 1e-6
             
@@ -837,7 +1190,7 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
             else:
                 remaining = 0
             
-            status_placeholder.info(f"Cycle {cycle} / {max_cycles}")
+            status_placeholder.info(f"**Cycle {cycle} / {max_cycles}**")
             details_placeholder.markdown(
                 f"""
                 <div style="background-color: #fff3f3; padding: 15px; border-radius: 10px; border-left: 8px solid #ff4b4b; margin: 10px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
@@ -868,22 +1221,32 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
                 if st.session_state.paused:
                     st.info(t('paused'))
             
+            # تفعيل التسريع التلقائي
             if not acceleration_active and gap < 2.0 and R_val < 0.01:
                 acceleration_active = True
                 st.success(t('acceleration_on'))
+            elif acceleration_active and (gap >= 2.0 or R_val >= 0.01):
+                acceleration_active = False
             
+            # معايير التوقف
             stop_now = False
+            
+            # 1. الصبر
             if no_improve >= patience:
                 stop_reason = f"{t('patience')} ({patience})"
                 stop_now = True
+            
+            # 2. R threshold مع استقرار الفجوة
             if not stop_now and use_R and R_val < R_tol:
                 if last_gap is not None and abs(gap - last_gap) < 1e-6:
                     stable_gap_count += 1
                     if stable_gap_count >= stable_gap_needed:
-                        stop_reason = f"R < {R_tol}"
+                        stop_reason = f"R < {R_tol} and gap stable"
                         stop_now = True
                 else:
                     stable_gap_count = 0
+            
+            # 3. تكرار التكلفة
             if not stop_now and use_cost_repeat:
                 if last_cost is not None and abs(new_cost - last_cost) < 1e-6:
                     cost_repeat_count += 1
@@ -892,6 +1255,8 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
                         stop_now = True
                 else:
                     cost_repeat_count = 0
+            
+            # 4. تكرار الفجوة
             if not stop_now and use_gap_repeat:
                 if last_gap is not None and abs(gap - last_gap) < 1e-6:
                     gap_repeat_count += 1
@@ -900,22 +1265,54 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
                         stop_now = True
                 else:
                     gap_repeat_count = 0
+            
+            # 5. الانكماش
             if not stop_now and use_contraction:
                 if diff < diff_tol and R_val < R_tol:
                     stop_reason = t('use_contraction')
                     stop_now = True
+            
+            # 6. استقرار R (التغير النسبي)
+            if not stop_now and use_R_stability:
+                if len(R_history) >= 2:
+                    prev_R = R_history[-2]
+                    if prev_R > 1e-12:
+                        rel_change = abs(R_val - prev_R) / prev_R
+                        if rel_change < R_stability_tol:
+                            r_stable_count += 1
+                            if r_stable_count >= R_stability_cycles:
+                                stop_reason = f"R stability ({R_stability_tol})"
+                                stop_now = True
+                        else:
+                            r_stable_count = 0
+                    else:
+                        # R صفر عملياً
+                        r_stable_count += 1
+                        if r_stable_count >= R_stability_cycles:
+                            stop_reason = "R ~ 0"
+                            stop_now = True
+                else:
+                    r_stable_count = 0
             
             last_cost = new_cost
             last_gap = gap
             last_R = R_val
             last_x = new_x.copy()
             
+            # حفظ checkpoint دوري
             if time.time() - last_save_time > 5:
-                problem_data = {
-                    'type': 'UFLP' if uflp_info else 'ILP',
-                    'n': n,
+                runtime_info = {
+                    'cycle': cycle,
+                    'best_cost': best_cost,
+                    'best_x': x.tolist(),
+                    'history': cycles_log,
+                    'lp_val': lp_val,
+                    'total_time': elapsed,
                 }
-                save_state(STATE_FILE, cycle, best_cost, x, cycles_log, lp_val, elapsed, problem_data)
+                checkpoint = build_checkpoint(problem, runtime_info)
+                save_checkpoint_local(checkpoint)
+                # أيضاً حفظ في الملف القديم للتوافق
+                save_state(STATE_FILE, cycle, best_cost, x, cycles_log, lp_val, elapsed, {'problem': problem})
                 last_save_time = time.time()
             
             if stop_now:
@@ -946,7 +1343,7 @@ def solve_ahrh(obj, A, b, uflp_info, max_cycles, k_coarse, patience,
         'stop_reason': stop_reason,
         'acceleration_active': acceleration_active,
         'total_time': total_time,
-        'open_fac': len(np.where(x > 0.5)[0]) if uflp_info else None
+        'open_fac': None,  # لم نعد نخزنها هنا، يمكن استخراجها من meta
     }
 
 # ------------------- Streamlit Interface -------------------
@@ -1077,9 +1474,9 @@ st.caption(t('note_uflp'))
 with st.sidebar:
     st.markdown(f"## {t('sidebar_algo')}")
     
-    max_cycles = st.slider(t('max_cycles'), 10, 200, 50, 10)
-    k_coarse = st.slider(t('k_coarse'), 3, 20, 10)
-    patience = st.slider(t('patience'), 5, 50, 15)
+    max_cycles = st.slider(t('max_cycles'), 10, 500, 100, 10)
+    k_coarse = st.slider(t('k_coarse'), 3, 30, 15)
+    patience = st.slider(t('patience'), 5, 100, 20)
     
     st.markdown("---")
     st.markdown(f"## {t('sidebar_stop')}")
@@ -1088,21 +1485,21 @@ with st.sidebar:
     use_R = st.checkbox(t('use_R'), value=True)
     if use_R:
         R_tol = st.number_input(t('R_tol'), value=1e-4, format="%.0e", step=1e-4)
-        stable_gap_needed = st.number_input(t('stable_gap'), min_value=1, max_value=10, value=3)
+        stable_gap_needed = st.number_input(t('stable_gap'), min_value=1, max_value=20, value=5)
     else:
-        R_tol, stable_gap_needed = 1e-4, 3
+        R_tol, stable_gap_needed = 1e-4, 5
     
     use_cost_repeat = st.checkbox(t('use_cost_repeat'), value=False)
     if use_cost_repeat:
-        cost_repeat_times = st.number_input(t('cost_repeat_times'), min_value=2, max_value=20, value=5)
+        cost_repeat_times = st.number_input(t('cost_repeat_times'), min_value=2, max_value=50, value=10)
     else:
-        cost_repeat_times = 5
+        cost_repeat_times = 10
     
     use_gap_repeat = st.checkbox(t('use_gap_repeat'), value=False)
     if use_gap_repeat:
-        gap_repeat_times = st.number_input(t('gap_repeat_times'), min_value=2, max_value=20, value=5)
+        gap_repeat_times = st.number_input(t('gap_repeat_times'), min_value=2, max_value=50, value=10)
     else:
-        gap_repeat_times = 5
+        gap_repeat_times = 10
     
     use_contraction = st.checkbox(t('use_contraction'), value=True)
     if use_contraction:
@@ -1110,22 +1507,22 @@ with st.sidebar:
     else:
         diff_tol = 1e-8
     
+    # معيار استقرار R
+    use_R_stability = st.checkbox(t('use_R_stability'), value=True)
+    if use_R_stability:
+        R_stability_tol = st.number_input(t('R_stability_tol'), value=1e-3, format="%.0e", step=1e-3)
+        R_stability_cycles = st.number_input(t('R_stability_cycles'), min_value=2, max_value=20, value=5)
+    else:
+        R_stability_tol, R_stability_cycles = 1e-3, 5
+    
     st.markdown("---")
-    st.write(f"{t('workers')}: {NUM_WORKERS}")
+    st.write(f"👥 {t('workers')}: {NUM_WORKERS}")
     
     if os.path.exists(STATE_FILE):
         if st.button(t('delete_state')):
             if delete_state(STATE_FILE):
                 st.success(t('delete_state'))
                 st.rerun()
-
-# Problem type selection
-problem_type = st.radio(
-    t('select_problem_type'),
-    [t('ilp'), t('milp'), t('uflp')],
-    horizontal=True
-)
-is_uflp = (problem_type == t('uflp'))
 
 # Main tabs
 tab1, tab2 = st.tabs([t('tab_upload'), t('tab_manual')])
@@ -1148,7 +1545,6 @@ with tab1:
             st.markdown(f"**MPS:**\n{t('mps_format_help')}")
             st.markdown(f"**gs250a-1:**\n{t('koerkel_help')}")
     
-    # نقبل أي ملف بدون تحديد نوع
     uploaded_file = st.file_uploader(
         t('choose_file'), 
         type=None,  # نقبل أي نوع ملف
@@ -1171,13 +1567,16 @@ with tab1:
                 
                 try:
                     with st.spinner(t('detecting_format')):
-                        obj, A, b, n, m, uflp_info, detected_type = flexible_file_reader(text)
+                        problem, detected_type = flexible_file_reader(text, uploaded_file.name)
+                    
+                    n = len(problem["obj"])
+                    m = len(problem["b"])
                     
                     # Problem info
                     st.markdown(f"""
                     <div class="success-box">
                         <h4>{t('problem_info')}</h4>
-                        <p><b>{t('problem_type')}:</b> {detected_type.upper()}</p>
+                        <p><b>{t('problem_type')}:</b> {problem['original_type']} ({detected_type})</p>
                         <p><b>{t('variables')}:</b> {n}</p>
                         <p><b>{t('constraints')}:</b> {m}</p>
                         <p><b>{t('format_detected')}:</b> {detected_type}</p>
@@ -1189,47 +1588,47 @@ with tab1:
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button(t('resume')):
-                                result = solve_ahrh(obj, A, b, uflp_info,
+                                result = solve_ahrh(problem,
                                                     max_cycles, k_coarse, patience,
                                                     use_R, R_tol, stable_gap_needed,
                                                     use_cost_repeat, cost_repeat_times,
                                                     use_gap_repeat, gap_repeat_times,
                                                     use_contraction, diff_tol,
+                                                    use_R_stability, R_stability_tol, R_stability_cycles,
                                                     resume=True)
-                                st.session_state.result = result
-                                st.session_state.n = n
-                                st.session_state.m = m
-                                st.session_state.problem_type = detected_type
-                                st.rerun()
+                                if result:
+                                    st.session_state.result = result
+                                    st.session_state.problem = problem
+                                    st.rerun()
                         with col2:
                             if st.button(t('reset')):
                                 if os.path.exists(STATE_FILE):
                                     os.remove(STATE_FILE)
-                                result = solve_ahrh(obj, A, b, uflp_info,
+                                result = solve_ahrh(problem,
                                                     max_cycles, k_coarse, patience,
                                                     use_R, R_tol, stable_gap_needed,
                                                     use_cost_repeat, cost_repeat_times,
                                                     use_gap_repeat, gap_repeat_times,
                                                     use_contraction, diff_tol,
+                                                    use_R_stability, R_stability_tol, R_stability_cycles,
                                                     resume=False)
-                                st.session_state.result = result
-                                st.session_state.n = n
-                                st.session_state.m = m
-                                st.session_state.problem_type = detected_type
-                                st.rerun()
+                                if result:
+                                    st.session_state.result = result
+                                    st.session_state.problem = problem
+                                    st.rerun()
                     else:
-                        result = solve_ahrh(obj, A, b, uflp_info,
+                        result = solve_ahrh(problem,
                                             max_cycles, k_coarse, patience,
                                             use_R, R_tol, stable_gap_needed,
                                             use_cost_repeat, cost_repeat_times,
                                             use_gap_repeat, gap_repeat_times,
                                             use_contraction, diff_tol,
+                                            use_R_stability, R_stability_tol, R_stability_cycles,
                                             resume=False)
-                        st.session_state.result = result
-                        st.session_state.n = n
-                        st.session_state.m = m
-                        st.session_state.problem_type = detected_type
-                        st.rerun()
+                        if result:
+                            st.session_state.result = result
+                            st.session_state.problem = problem
+                            st.rerun()
                 
                 except Exception as e:
                     st.error(f"{t('error')}: {str(e)}")
@@ -1243,141 +1642,15 @@ with tab2:
     </div>
     """, unsafe_allow_html=True)
     
-    col1, col2 = st.columns(2)
-    with col1:
-        n_man = st.number_input(t('manual_n'), min_value=1, max_value=10, value=3, step=1, key="n_man")
-    with col2:
-        m_man = st.number_input(t('manual_m'), min_value=1, max_value=10, value=3, step=1, key="m_man")
-    
-    if is_uflp:
-        # UFLP manual input
-        st.subheader(t('manual_f'))
-        if 'f_man' not in st.session_state or len(st.session_state.f_man) != n_man:
-            st.session_state.f_man = np.ones(n_man) * 1000
-        f_vals = []
-        cols = st.columns(min(5, n_man))
-        for i in range(n_man):
-            with cols[i % 5]:
-                val = st.number_input(f"f[{i}]", value=float(st.session_state.f_man[i]), key=f"f_man_{i}")
-                f_vals.append(val)
-        st.session_state.f_man = np.array(f_vals)
-        
-        st.subheader(t('manual_costs'))
-        if 'c_man' not in st.session_state or st.session_state.c_man.shape != (n_man, m_man):
-            st.session_state.c_man = np.ones((n_man, m_man)) * 100
-        for i in range(n_man):
-            st.write(f"**الموقع {i+1}:**")
-            cols = st.columns(min(5, m_man))
-            for j in range(m_man):
-                with cols[j % 5]:
-                    val = st.number_input(f"c[{i}][{j}]", value=float(st.session_state.c_man[i, j]), key=f"c_man_{i}_{j}")
-                    st.session_state.c_man[i, j] = val
-    else:
-        # ILP/MILP manual input
-        st.subheader(t('manual_c'))
-        if 'c_man' not in st.session_state or len(st.session_state.c_man) != n_man:
-            st.session_state.c_man = np.ones(n_man)
-        c_vals = []
-        cols = st.columns(min(5, n_man))
-        for i in range(n_man):
-            with cols[i % 5]:
-                val = st.number_input(f"c[{i}]", value=float(st.session_state.c_man[i]), key=f"c_man_{i}")
-                c_vals.append(val)
-        st.session_state.c_man = np.array(c_vals)
-        
-        st.subheader(t('manual_A'))
-        if 'A_man' not in st.session_state or st.session_state.A_man.shape != (m_man, n_man):
-            st.session_state.A_man = np.ones((m_man, n_man))
-        for i in range(m_man):
-            st.write(f"**{t('constraints')} {i+1}:**")
-            cols = st.columns(min(5, n_man))
-            for j in range(n_man):
-                with cols[j % 5]:
-                    val = st.number_input(f"A[{i}][{j}]", value=float(st.session_state.A_man[i, j]), key=f"A_man_{i}_{j}")
-                    st.session_state.A_man[i, j] = val
-        
-        st.subheader(t('manual_b'))
-        if 'b_man' not in st.session_state or len(st.session_state.b_man) != m_man:
-            st.session_state.b_man = np.ones(m_man) * 10
-        b_vals = []
-        cols = st.columns(min(5, m_man))
-        for i in range(m_man):
-            with cols[i % 5]:
-                val = st.number_input(f"b[{i}]", value=float(st.session_state.b_man[i]), key=f"b_man_{i}")
-                b_vals.append(val)
-        st.session_state.b_man = np.array(b_vals)
-    
-    if st.button(t('solve_button'), key="solve_manual"):
-        with st.spinner(t('solve_button')):
-            try:
-                if is_uflp:
-                    f = st.session_state.f_man
-                    c = st.session_state.c_man
-                    obj, A, b, n_vars, n_constraints, n_y = uflp_to_ilp(f, c)
-                    uflp_info = {'n_y': n_y, 'f': f, 'c': c}
-                    detected_type = 'uflp'
-                else:
-                    obj = st.session_state.c_man
-                    A = st.session_state.A_man
-                    b = st.session_state.b_man
-                    uflp_info = None
-                    detected_type = 'ilp'
-                
-                if os.path.exists(STATE_FILE):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button(t('resume'), key="resume_manual"):
-                            result = solve_ahrh(obj, A, b, uflp_info,
-                                                max_cycles, k_coarse, patience,
-                                                use_R, R_tol, stable_gap_needed,
-                                                use_cost_repeat, cost_repeat_times,
-                                                use_gap_repeat, gap_repeat_times,
-                                                use_contraction, diff_tol,
-                                                resume=True)
-                            st.session_state.result = result
-                            st.session_state.n = n_man
-                            st.session_state.m = m_man
-                            st.session_state.problem_type = detected_type
-                            st.rerun()
-                    with col2:
-                        if st.button(t('reset'), key="reset_manual"):
-                            if os.path.exists(STATE_FILE):
-                                os.remove(STATE_FILE)
-                            result = solve_ahrh(obj, A, b, uflp_info,
-                                                max_cycles, k_coarse, patience,
-                                                use_R, R_tol, stable_gap_needed,
-                                                use_cost_repeat, cost_repeat_times,
-                                                use_gap_repeat, gap_repeat_times,
-                                                use_contraction, diff_tol,
-                                                resume=False)
-                            st.session_state.result = result
-                            st.session_state.n = n_man
-                            st.session_state.m = m_man
-                            st.session_state.problem_type = detected_type
-                            st.rerun()
-                else:
-                    result = solve_ahrh(obj, A, b, uflp_info,
-                                        max_cycles, k_coarse, patience,
-                                        use_R, R_tol, stable_gap_needed,
-                                        use_cost_repeat, cost_repeat_times,
-                                        use_gap_repeat, gap_repeat_times,
-                                        use_contraction, diff_tol,
-                                        resume=False)
-                    st.session_state.result = result
-                    st.session_state.n = n_man
-                    st.session_state.m = m_man
-                    st.session_state.problem_type = detected_type
-                    st.rerun()
-            
-            except Exception as e:
-                st.error(f"{t('error')}: {str(e)}")
-                st.code(traceback.format_exc())
+    # هنا يمكن توسعة الإدخال اليدوي لاحقاً
+    st.info("هذا الجزء قيد التطوير. استخدم رفع الملفات حالياً.")
 
 # ------------------- Results Display -------------------
 st.markdown("---")
 
 if st.session_state.get('result') is not None:
     res = st.session_state.result
+    problem = st.session_state.get('problem', None)
     
     st.markdown(f"""
     <div class="success-box">
@@ -1409,11 +1682,12 @@ if st.session_state.get('result') is not None:
         </div>
         """, unsafe_allow_html=True)
     with colD:
-        if res.get('open_fac') is not None:
-            val = res['open_fac']
+        if problem and problem['original_type'] == 'UFLP':
+            # نحاول استخراج عدد المرافق المفتوحة (يمكن إضافتها لاحقاً)
+            val = "—"
             label = t('open_fac')
         else:
-            val = f"{st.session_state.get('n', 0)}×{st.session_state.get('m', 0)}"
+            val = f"{len(problem['obj']) if problem else 0}×{len(problem['b']) if problem else 0}"
             label = t('size')
         st.markdown(f"""
         <div class="metric-card">
