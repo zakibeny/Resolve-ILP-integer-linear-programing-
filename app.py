@@ -57,11 +57,4 @@ This repository contains the **Advanced Hierarchical Radial Heuristic (AHRH)** a
 3. Upload a problem file or generate a random instance.
 """
 
-# requirements.txt
-"""
-streamlit
-numpy
-pandas
-matplotlib
-pulp
-"""
+
