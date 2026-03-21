@@ -9,7 +9,7 @@
 # 1. ملف secrets.toml
 """
 [GITHUB]
-TOKEN = "ghp_XXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+TOKEN = "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"
 REPO = "username/AHRH_GitHub"
 """
 
