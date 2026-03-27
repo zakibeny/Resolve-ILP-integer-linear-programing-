@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 from PIL import Image
 import base64
+
 # محاكاة البحث المحلي المتقدم
 def local_search_advanced(variables):
     n = len(variables)
@@ -72,7 +73,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# إضافة خيار تغيير الخلفية مرة واحدة فقط
+# إضافة خلفية ثابتة بعد رفعها مرة واحدة فقط
 if "background_uploaded" not in st.session_state:
     st.session_state.background_uploaded = False
 
