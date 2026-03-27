@@ -38,8 +38,7 @@ def algorithm_with_advanced_local_search(variables, max_iterations=100):
                 best_cost = new_cost
     return best_solution, best_cost
 
-
-# رفع الصورة من الجهاز لتغيير الخلفية
+# إضافة الديكور باستخدام CSS لعرض صورة الخلفية
 uploaded_file = st.file_uploader("اختر صورة خلفية", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
