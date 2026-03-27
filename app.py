@@ -55,8 +55,49 @@ st.markdown("""
         background-color: #0066cc; /* تخصيص لون الأزرار */
         color: white;
     }
+    /* تخصيص الألوان والكونتراست لتحسين قراءة النصوص */
+    body {
+        color: #333333;
+    }
+    h1, h2, h3, h4, h5, h6 {
+        color: #003366;
+    }
+    .stTextInput input {
+        color: #000000; /* تغيير لون النص داخل حقول الإدخال */
+    }
     </style>
 """, unsafe_allow_html=True)
+
+# إضافة خيار تغيير الخلفية مرة واحدة فقط
+if "background_uploaded" not in st.session_state:
+    st.session_state.background_uploaded = False
+
+if not st.session_state.background_uploaded:
+    uploaded_file = st.file_uploader("اختر صورة خلفية (سيتم استخدامها مرة واحدة)", type=["jpg", "png", "jpeg"], key="background_file_uploader")
+    if uploaded_file is not None:
+        # تحويل الصورة إلى شكل Base64
+        image = Image.open(uploaded_file)
+        st.image(image, use_column_width=True)
+
+        # تحويل الصورة إلى base64 لتستخدم في الخلفية
+        img_bytes = uploaded_file.getvalue()
+        img_base64 = base64.b64encode(img_bytes).decode()
+
+        # إضافة الصورة كخلفية باستخدام CSS
+        st.markdown(f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/png;base64,{img_base64}");
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+
+        st.session_state.background_uploaded = True  # تم رفع الصورة وتم استخدامها
+
+# ----------------------------------
 
 # معلومات الاتصال
 CONTACT_EMAIL = "zakibeny@gmail.com"
