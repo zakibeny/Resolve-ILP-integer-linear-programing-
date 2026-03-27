@@ -2,7 +2,6 @@ import streamlit as st
 import numpy as np
 from PIL import Image
 import base64
-
 # محاكاة البحث المحلي المتقدم
 def local_search_advanced(variables):
     n = len(variables)
