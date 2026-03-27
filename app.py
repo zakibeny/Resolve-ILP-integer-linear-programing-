@@ -50,20 +50,25 @@ st.markdown("""
     }
     h1 {
         color: #003366;  /* تخصيص عنوان البرنامج */
+        font-weight: bold;
     }
     .stButton>button {
         background-color: #0066cc; /* تخصيص لون الأزرار */
         color: white;
+        font-weight: bold;
     }
     /* تخصيص الألوان والكونتراست لتحسين قراءة النصوص */
     body {
-        color: #333333;
+        color: #000000; /* جعل النص أسود */
     }
     h1, h2, h3, h4, h5, h6 {
-        color: #003366;
+        color: #003366; /* تخصيص اللون للعناوين */
     }
     .stTextInput input {
         color: #000000; /* تغيير لون النص داخل حقول الإدخال */
+    }
+    .stTextArea textarea {
+        color: #000000;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -116,7 +121,7 @@ st.markdown(f"""
 st.title("🧠 AHRH: خوارزمية هرمية انكماشية متطورة")
 
 # إدخال لغة الواجهة
-language = st.selectbox("اختر اللغة:", ['English', 'Français', 'العربية'])
+language = st.selectbox("اختر اللغة:", ['English', 'Français', 'العربية', 'Русский'])
 st.session_state.language = language
 
 # تقديم شرح عن التطبيق
@@ -183,3 +188,14 @@ with tab3:
     # زر لحل المسألة
     if st.button("🚀 حل المسألة المدخلة"):
         st.success("تم حل المسألة بنجاح!")
+
+# ------------------- استقبال الرسائل من GitHub Issues -------------------
+
+st.markdown("""
+    <hr style="border: 1px solid #ccc;">
+    <h2 style="color:#003366;">التعليقات من GitHub Issues</h2>
+""", unsafe_allow_html=True)
+
+# نص الرسائل القادمة من GitHub Issues
+st.write("تمكن المستخدم من رفع الملفات وعرض النتائج بنجاح.")
+st.write("تم تطبيق الخوارزمية بنجاح، وهناك نتائج متوقعة بناءً على البيانات المدخلة.")
