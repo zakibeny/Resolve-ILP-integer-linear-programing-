@@ -3,3 +3,5 @@ numpy
 pulp>=2.9.0
 matplotlib
 pandas
+numpy
+Pillow
