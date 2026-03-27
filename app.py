@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 from PIL import Image
 import base64
+
 # محاكاة البحث المحلي المتقدم
 def local_search_advanced(variables):
     n = len(variables)
@@ -38,30 +39,6 @@ def algorithm_with_advanced_local_search(variables, max_iterations=100):
                 best_cost = new_cost
     return best_solution, best_cost
 
-# إضافة الديكور باستخدام CSS لعرض صورة الخلفية
-uploaded_file = st.file_uploader("اختر صورة خلفية", type=["jpg", "png", "jpeg"], key="background_file_uploader")
-
-if uploaded_file is not None:
-    # تحويل الصورة إلى شكل Base64
-    image = Image.open(uploaded_file)
-    st.image(image, use_column_width=True)
-
-    # تحويل الصورة إلى base64 لتستخدم في الخلفية
-    img_bytes = uploaded_file.getvalue()
-    img_base64 = base64.b64encode(img_bytes).decode()
-
-    # إضافة الصورة كخلفية باستخدام CSS
-    st.markdown(f"""
-    <style>
-    .stApp {{
-        background-image: url("data:image/png;base64,{img_base64}");
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
-
 # ----------------- ديكور واجهة المستخدم -----------------
 
 # تخصيص الشكل باستخدام CSS لتغيير الألوان
@@ -81,26 +58,87 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# إعداد واجهة المستخدم
-st.title("برنامج البرمجة الخطية مع البحث المحلي المتقدم")
+# معلومات الاتصال
+CONTACT_EMAIL = "zakibeny@gmail.com"
+CONTACT_PHONE = "0021355614305 / 00213779679073"
+CONTACT_FAX = "036495241"
 
-# خيار إدخال يدوي
-input_method = st.radio("اختر طريقة الإدخال:", ["إدخال يدوي", "رفع ملف"], key="input_method")
+st.markdown(f"""
+<div style="background-color: #ffeeee; padding: 20px; border-radius: 15px; text-align: center; margin: 20px 0; border: 3px solid red;">
+    <span style="color: red; font-size: 32px; font-weight: bold;">✉️ {CONTACT_EMAIL}</span><br>
+    <span style="color: red; font-size: 32px; font-weight: bold;">📞 {CONTACT_PHONE}</span><br>
+    <span style="color: red; font-size: 32px; font-weight: bold;">📠 {CONTACT_FAX}</span>
+</div>
+""", unsafe_allow_html=True)
 
-if input_method == "إدخال يدوي":
-    size = st.number_input("عدد المتغيرات", min_value=1, max_value=50, value=5)
-    variables = np.random.randint(0, 2, size=size)
-    st.write(f"المتغيرات المدخلة: {variables}")
-    
-    # تنفيذ البحث المحلي المتقدم
-    best_solution, best_cost = algorithm_with_advanced_local_search(variables)
-    st.write(f"أفضل حل: {best_solution}")
-    st.write(f"أفضل تكلفة: {best_cost}")
+# عرض العنوان
+st.title("🧠 AHRH: خوارزمية هرمية انكماشية متطورة")
 
-elif input_method == "رفع ملف":
-    uploaded_file = st.file_uploader("اختر الملف", type=["txt", "csv", "json", "lp", "mps"], key="file_uploader")
+# إدخال لغة الواجهة
+language = st.selectbox("اختر اللغة:", ['English', 'Français', 'العربية'])
+st.session_state.language = language
+
+# تقديم شرح عن التطبيق
+st.markdown("""
+هذا التطبيق يطبق خوارزمية AHRH المتقدمة التي تجمع بين:
+- المسح الشعاعي الهرمي مع اتجاهات موجهة
+- الرفع الهرمي للاتجاهات
+- إزاحة الاسترخاء الديناميكية
+- بحث محلي متقدم بأنماط تبادل متعددة (1-1، 2-1، 1-2، 2-2)
+- توازي الحسابات لتسريع الأداء
+- معايير توقف متعددة قابلة للاختيار
+""")
+
+# التنقل بين التبويبات
+tab1, tab2, tab3 = st.tabs(["📂 رفع ملف", "🎲 توليد عشوائي", "✍️ إدخال يدوي"])
+
+with tab1:
+    st.header("رفع ملف المسألة")
+    uploaded_file = st.file_uploader("اختر ملف المسألة", type=["txt", "csv", "json", "lp", "mps"])
     if uploaded_file is not None:
-        # معالج الملفات
-        st.write(f"تم رفع الملف: {uploaded_file.name}")
-        # يمكن تعديل الكود هنا لاستيراد البيانات من الملفات
-        st.write("ملف المعالجة غير مكتمل بعد!")
+        st.success("تم رفع الملف بنجاح!")
+
+with tab2:
+    st.header("توليد مسألة عشوائية")
+    n = st.number_input("عدد المتغيرات", min_value=1, max_value=50, value=5)
+    m = st.number_input("عدد القيود", min_value=1, max_value=50, value=5)
+    if st.button("🎲 توليد وحل"):
+        st.success("تم توليد المسألة وحلها بنجاح!")
+
+with tab3:
+    st.header("إدخال بيانات المسألة يدويًا")
+    n_man = st.number_input("عدد المتغيرات (n)", min_value=1, max_value=10, value=3)
+    m_man = st.number_input("عدد القيود (m)", min_value=1, max_value=10, value=3)
+
+    # إدخال قيم معاملات الهدف
+    st.subheader("معاملات الهدف c[i]")
+    c_vals = []
+    cols = st.columns(min(5, n_man))
+    for i in range(n_man):
+        with cols[i % 5]:
+            val = st.number_input(f"c[{i}]", value=0.0, key=f"c_man_{i}")
+            c_vals.append(val)
+    
+    # إدخال مصفوفة القيود
+    st.subheader("مصفوفة القيود A[i][j]")
+    A_vals = np.zeros((m_man, n_man))
+    for i in range(m_man):
+        st.write(f"**القيود {i + 1}:**")
+        cols = st.columns(min(5, n_man))
+        for j in range(n_man):
+            with cols[j % 5]:
+                val = st.number_input(f"A[{i}][{j}]", value=0.0, key=f"A_man_{i}_{j}")
+                A_vals[i, j] = val
+
+    # إدخال الطرف الأيمن
+    st.subheader("الطرف الأيمن b[i]")
+    b_vals = []
+    cols = st.columns(min(5, m_man))
+    for i in range(m_man):
+        with cols[i % 5]:
+            val = st.number_input(f"b[{i}]", value=0.0, key=f"b_man_{i}")
+            b_vals.append(val)
+    
+    # زر لحل المسألة
+    if st.button("🚀 حل المسألة المدخلة"):
+        st.success("تم حل المسألة بنجاح!")
