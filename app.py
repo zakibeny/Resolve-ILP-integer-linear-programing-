@@ -4,7 +4,6 @@ import time
 import requests
 import json
 from datetime import datetime
-from PIL import Image
 import base64
 import os
 
@@ -283,15 +282,22 @@ st.set_page_config(page_title="MARIA Solver", layout="wide")
 if 'language' not in st.session_state:
     st.session_state.language = 'العربية'
 
-# خلفية ثابتة من ملف في المستودع
-BACKGROUND_IMAGE = "background.pgn"
+# ------------------- خلفية ثابتة من ملف background.png -------------------
+BACKGROUND_IMAGE = "background.png"  # غيّر الاسم حسب الصورة لديك
 if os.path.exists(BACKGROUND_IMAGE):
     with open(BACKGROUND_IMAGE, "rb") as f:
         img_base64 = base64.b64encode(f.read()).decode()
+    # تحديد نوع MIME حسب الامتداد
+    if BACKGROUND_IMAGE.endswith('.png'):
+        mime = "image/png"
+    elif BACKGROUND_IMAGE.endswith('.jpg') or BACKGROUND_IMAGE.endswith('.jpeg'):
+        mime = "image/jpeg"
+    else:
+        mime = "image/png"
     st.markdown(f"""
     <style>
     .stApp {{
-        background-image: url("data:image/png;base64,{img_base64}");
+        background-image: url("data:{mime};base64,{img_base64}");
         background-size: cover;
         background-repeat: no-repeat;
         background-attachment: fixed;
@@ -299,7 +305,7 @@ if os.path.exists(BACKGROUND_IMAGE):
     </style>
     """, unsafe_allow_html=True)
 else:
-    st.sidebar.warning(f"⚠️ Background image '{BACKGROUND_IMAGE}' not found. Using default.")
+    st.sidebar.warning(f"⚠️ لم يتم العثور على ملف الخلفية '{BACKGROUND_IMAGE}'. تأكد من وجوده في المجلد الرئيسي.")
 
 # معلومات الاتصال (ثابتة)
 CONTACT_EMAIL = "zakibeny@gmail.com"
@@ -379,10 +385,8 @@ with tab2:
         time_placeholder = st.empty()
         start_time = time.time()
         iteration_times = []
-        stop_flag = False
         
         def update_progress(iteration, total):
-            nonlocal stop_flag
             percent = (iteration + 1 - start_iter) / (total - start_iter) if total > start_iter else 1
             progress_bar.progress(percent)
             status_text.write(f"**{t('progress_text')}** {percent:.0%} (iter {iteration+1}/{total})")
@@ -394,7 +398,7 @@ with tab2:
             remaining = avg_time * (total - iteration - 1)
             time_placeholder.write(f"{t('estimated_time')} {remaining:.1f} {t('seconds')}")
             iteration_times.append(avg_time)
-            return stop_flag
+            return False  # لا نوقف التنفيذ
         
         def save_checkpoint(iteration, solution, cost):
             st.session_state.checkpoint = {
