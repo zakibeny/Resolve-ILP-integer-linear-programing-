@@ -284,7 +284,7 @@ if 'language' not in st.session_state:
     st.session_state.language = 'العربية'
 
 # خلفية ثابتة من ملف في المستودع
-BACKGROUND_IMAGE = "background.jpg"
+BACKGROUND_IMAGE = "background.pgn"
 if os.path.exists(BACKGROUND_IMAGE):
     with open(BACKGROUND_IMAGE, "rb") as f:
         img_base64 = base64.b64encode(f.read()).decode()
