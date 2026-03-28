@@ -1,6 +1,5 @@
 import streamlit as st
 import numpy as np
-import time
 import requests
 import json
 from datetime import datetime
@@ -8,11 +7,11 @@ import base64
 import os
 
 # ----------------------------------------------------------------------
-# ترجمة النصوص (متعددة اللغات)
+# ترجمة النصوص (متعددة اللغات) - جميع المفاتيح موجودة
 # ----------------------------------------------------------------------
 translations = {
     'العربية': {
-        'app_title': '🧠 MARIA:خوارزمية البرمجة الخطية الصحيحة ILP UFPS mbs...',
+        'app_title': '🧠 MARIA: خوارزمية البرمجة الخطية الصحيحة ILP UFPS mbs.transport',
         'app_desc': 'هذا التطبيق يطبق خوارزمية MARIA المتقدمة التي تجمع بين:',
         'feature1': 'المسح الشعاعي الهرمي مع اتجاهات موجهة',
         'feature2': 'الرفع الهرمي للاتجاهات',
@@ -28,6 +27,8 @@ translations = {
         'upload_error': 'خطأ في قراءة الملف:',
         'manual_header': 'إدخال بيانات المسألة يدويًا',
         'manual_warning': 'للمسائل الصغيرة فقط (n ≤ 10, m ≤ 10)',
+        'n_vars': 'عدد المتغيرات (n)',
+        'n_constraints': 'عدد القيود (m)',
         'c_coeff': 'معاملات الهدف c[i]',
         'A_matrix': 'مصفوفة القيود A[i][j]',
         'b_rhs': 'الطرف الأيمن b[i]',
@@ -44,7 +45,7 @@ translations = {
         'footer': 'تم التطوير بواسطة Zakarya Benregreg - خوارزمية MARIA محمية ببراءة اختراع.',
     },
     'English': {
-        'app_title': '🧠 MARIA: Advanced Optimization Algorithm',
+        'app_title': '🧠 MARIA: Integer Linear Programming ILP UFPS mbs.transport',
         'app_desc': 'This app implements the MARIA algorithm, combining:',
         'feature1': 'Hierarchical radial scan with biased directions',
         'feature2': 'Hierarchical direction lifting',
@@ -60,6 +61,8 @@ translations = {
         'upload_error': 'Error reading file:',
         'manual_header': 'Manual Data Entry',
         'manual_warning': 'For small problems only (n ≤ 10, m ≤ 10)',
+        'n_vars': 'Number of variables (n)',
+        'n_constraints': 'Number of constraints (m)',
         'c_coeff': 'Objective coefficients c[i]',
         'A_matrix': 'Constraint matrix A[i][j]',
         'b_rhs': 'Right-hand side b[i]',
@@ -76,7 +79,7 @@ translations = {
         'footer': 'Developed by Zakarya Benregreg - MARIA algorithm patented.',
     },
     'Français': {
-        'app_title': '🧠 MARIA: Algorithme avancé d\'optimisation',
+        'app_title': '🧠 MARIA: Programmation Linéaire en Nombres Entiers ILP UFPS mbs.transport',
         'app_desc': 'Cette application implémente l\'algorithme MARIA, combinant :',
         'feature1': 'Balayage radial hiérarchique avec directions orientées',
         'feature2': 'Relèvement hiérarchique des directions',
@@ -92,6 +95,8 @@ translations = {
         'upload_error': 'Erreur de lecture du fichier :',
         'manual_header': 'Saisie manuelle des données',
         'manual_warning': 'Pour petits problèmes seulement (n ≤ 10, m ≤ 10)',
+        'n_vars': 'Nombre de variables (n)',
+        'n_constraints': 'Nombre de contraintes (m)',
         'c_coeff': 'Coefficients objectifs c[i]',
         'A_matrix': 'Matrice des contraintes A[i][j]',
         'b_rhs': 'Second membre b[i]',
@@ -108,7 +113,7 @@ translations = {
         'footer': 'Développé par Zakarya Benregreg - Algorithme MARIA breveté.',
     },
     'Русский': {
-        'app_title': '🧠 MARIA: Продвинутый алгоритм оптимизации',
+        'app_title': '🧠 MARIA: Целочисленное линейное программирование ILP UFPS mbs.transport',
         'app_desc': 'Это приложение реализует алгоритм MARIA, объединяющий:',
         'feature1': 'Иерархическое радиальное сканирование с направленными направлениями',
         'feature2': 'Иерархический подъём направлений',
@@ -124,6 +129,8 @@ translations = {
         'upload_error': 'Ошибка чтения файла:',
         'manual_header': 'Ручной ввод данных',
         'manual_warning': 'Только для небольших задач (n ≤ 10, m ≤ 10)',
+        'n_vars': 'Количество переменных (n)',
+        'n_constraints': 'Количество ограничений (m)',
         'c_coeff': 'Коэффициенты целевой функции c[i]',
         'A_matrix': 'Матрица ограничений A[i][j]',
         'b_rhs': 'Правая часть b[i]',
@@ -142,7 +149,12 @@ translations = {
 }
 
 def t(key):
-    return translations[st.session_state.language][key]
+    """دالة الترجمة مع معالجة الأخطاء"""
+    try:
+        return translations[st.session_state.language][key]
+    except KeyError:
+        # إذا لم يوجد المفتاح، نرجع النص نفسه كاحتياط
+        return key
 
 # ----------------------------------------------------------------------
 # منطق الخوارزمية (MARIA) - لم يتغير
@@ -218,7 +230,7 @@ st.set_page_config(page_title="MARIA Solver", layout="wide")
 if 'language' not in st.session_state:
     st.session_state.language = 'English'
 
-# CSS لتكبير الخط وجعله أسود
+# CSS لتحسين وضوح النص (أسود غامق، سماكة عالية)
 st.markdown("""
 <style>
     html, body, [class*="css"]  {
@@ -233,9 +245,18 @@ st.markdown("""
         font-weight: 700;
         color: #000000;
     }
-    p, div, span, label, .stMarkdown {
+    p, div, span, label, .stMarkdown, .stText, .stNumberInput, .stSelectbox {
         font-weight: 500;
         color: #000000;
+    }
+    /* تحسين تباين العناصر التفاعلية */
+    .stButton button {
+        font-weight: bold;
+        color: #000000;
+    }
+    .stTextInput input, .stTextArea textarea {
+        color: #000000;
+        font-weight: 500;
     }
 </style>
 """, unsafe_allow_html=True)
