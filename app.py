@@ -149,11 +149,9 @@ translations = {
 }
 
 def t(key):
-    """دالة الترجمة مع معالجة الأخطاء"""
     try:
         return translations[st.session_state.language][key]
     except KeyError:
-        # إذا لم يوجد المفتاح، نرجع النص نفسه كاحتياط
         return key
 
 # ----------------------------------------------------------------------
@@ -230,33 +228,110 @@ st.set_page_config(page_title="MARIA Solver", layout="wide")
 if 'language' not in st.session_state:
     st.session_state.language = 'English'
 
-# CSS لتحسين وضوح النص (أسود غامق، سماكة عالية)
+# ------------------- CSS لتحسين القراءة -------------------
 st.markdown("""
 <style>
-    html, body, [class*="css"]  {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-weight: 600;
-        color: #000000;
+    /* تعتيم الخلفية (طبقة شفافة داكنة فوق الصورة) */
+    .stApp::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.65);  /* درجة التعتيم */
+        z-index: -1;
     }
     .stApp {
-        background-color: #f5f5f5;
+        background-color: transparent !important;
     }
+    /* خلفية بيضاء شفافة لجميع العناصر النصية */
+    div[data-testid="stMarkdownContainer"], 
+    .stMarkdown, 
+    .stText, 
+    .stNumberInput, 
+    .stSelectbox, 
+    .stTextInput, 
+    .stTextArea, 
+    .stButton button,
+    .stAlert,
+    .stSuccess,
+    .stError,
+    .stWarning,
+    .stInfo,
+    .stExpander,
+    .stTabs,
+    .stTab,
+    .element-container,
+    .stHeader,
+    .stSubheader,
+    .stCaption,
+    .stForm {
+        background-color: rgba(255, 255, 255, 0.9) !important;
+        border-radius: 12px;
+        padding: 8px 12px;
+        margin: 8px 0;
+        color: #000000 !important;
+        font-size: 18px;
+        line-height: 1.5;
+        backdrop-filter: blur(2px);
+    }
+    /* تحسين ظهور العناوين */
     h1, h2, h3, h4, h5, h6 {
-        font-weight: 700;
-        color: #000000;
-    }
-    p, div, span, label, .stMarkdown, .stText, .stNumberInput, .stSelectbox {
-        font-weight: 500;
-        color: #000000;
-    }
-    /* تحسين تباين العناصر التفاعلية */
-    .stButton button {
+        background-color: rgba(255, 255, 255, 0.9) !important;
+        border-radius: 12px;
+        padding: 8px 12px;
+        margin: 12px 0;
+        color: #000000 !important;
         font-weight: bold;
-        color: #000000;
+        font-size: 1.5em;
     }
-    .stTextInput input, .stTextArea textarea {
-        color: #000000;
-        font-weight: 500;
+    /* الحفاظ على خلفية الصورة */
+    .stApp > header, .stApp > .main {
+        background: transparent !important;
+    }
+    /* تحسين حقول الإدخال */
+    input, textarea, select {
+        background-color: white !important;
+        color: black !important;
+        font-size: 16px !important;
+        border-radius: 8px;
+    }
+    /* الأزرار */
+    .stButton button {
+        background-color: #ffffffcc !important;
+        color: black !important;
+        font-weight: bold;
+        border: 1px solid #aaa;
+    }
+    .stButton button:hover {
+        background-color: white !important;
+    }
+    /* التبويبات */
+    .stTabs [data-baseweb="tab-list"] button {
+        background-color: rgba(255, 255, 255, 0.85) !important;
+        color: black !important;
+        font-weight: bold;
+    }
+    /* المربع الأحمر لمعلومات الاتصال */
+    .contact-box {
+        background-color: #ffeeee !important;
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        margin: 20px 0;
+        border: 3px solid red;
+        color: red;
+    }
+    .contact-box span {
+        color: red;
+        font-size: 32px;
+        font-weight: bold;
+    }
+    /* تعديل الخط العام */
+    body, .stApp, div, p, span, label {
+        font-size: 18px !important;
+        font-weight: 500 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -279,11 +354,12 @@ if os.path.exists(BACKGROUND_IMAGE):
         background-size: cover;
         background-repeat: no-repeat;
         background-attachment: fixed;
+        background-color: transparent;
     }}
     </style>
     """, unsafe_allow_html=True)
 else:
-    st.sidebar.warning(f"⚠️ لم يتم العثور على ملف الخلفية '{BACKGROUND_IMAGE}'. تأكد من وجوده في المجلد الرئيسي.")
+    st.sidebar.warning(f"⚠️ لم يتم العثور على ملف الخلفية '{BACKGROUND_IMAGE}'. سيتم استخدام خلفية بيضاء.")
 
 # معلومات الاتصال (المربع الأحمر)
 CONTACT_EMAIL = "zakibeny@gmail.com"
@@ -298,12 +374,12 @@ with col2:
     lang = st.selectbox("", ['English', 'Français', 'العربية', 'Русский'], key='lang_selector')
     st.session_state.language = lang
 
-# المربع الأحمر
+# المربع الأحمر (نستخدم div مخصص لتجنب تطبيق الخلفية البيضاء عليه)
 st.markdown(f"""
-<div style="background-color: #ffeeee; padding: 20px; border-radius: 15px; text-align: center; margin: 20px 0; border: 3px solid red;">
-    <span style="color: red; font-size: 32px; font-weight: bold;">✉️ {CONTACT_EMAIL}</span><br>
-    <span style="color: red; font-size: 32px; font-weight: bold;">📞 {CONTACT_PHONE}</span><br>
-    <span style="color: red; font-size: 32px; font-weight: bold;">📠 {CONTACT_FAX}</span>
+<div class="contact-box">
+    <span>✉️ {CONTACT_EMAIL}</span><br>
+    <span>📞 {CONTACT_PHONE}</span><br>
+    <span>📠 {CONTACT_FAX}</span>
 </div>
 """, unsafe_allow_html=True)
 
