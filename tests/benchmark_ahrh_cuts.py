@@ -57,7 +57,7 @@ def main():
     fixed6=[int(map_back[512+j]) for j in core]
     assert explain_exclusion(problem,fixed6) is None
     assert explain_exclusion(problem,fixed6+[int(map_back[0]),int(map_back[768])])=='mixed_sector_overlap'
-    assert explain_exclusion(problem,fixed6+[int(map_back[32])])=='collision'
+    assert explain_exclusion(problem,fixed6+[int(map_back[512+32])])=='collision'
     lifted=exact_lifted_star_lp_row(problem,0,0)
     assert int(np.sum(lifted))==11
     # 6 hard centers and one externally overlapped center force 21>20
