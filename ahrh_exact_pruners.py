@@ -41,25 +41,56 @@ def _guard(problem):
     return _CACHE_MAPPING, _CACHE_CERTS
 
 def explain_exclusion(problem, fixed_one_indices):
-    """Return a necessary-condition failure for a true fixed-ones branch."""
+    """Certified necessary condition for an ACTUAL fixed-one branch.
+
+    For every sector g (0..3), define U_g as union of the selected radius-one
+    Q8 neighborhoods and O_g as the overlap of fixed-one external centers
+    from sectors g xor 1 and g xor 2, projected onto their same low 8 bits.
+    Then 9*k_g - |U_g| + O_g <= 9*q_g + q_(g xor 1)+q_(g xor 2)-256
+    for every potentially completable branch. All LHS terms are monotone
+    under adding more fixed-one decisions, hence safe to prune early.
+    """
     mapping, certs = _guard(problem)
     if mapping is None:
         return None
-    one = {int(mapping[int(i)])-512 for i in fixed_one_indices
-           if 512 <= int(mapping[int(i)]) < 768}
-    if len(one) > 24:
+    sectors = [set() for _ in range(4)]
+    for i in fixed_one_indices:
+        j = int(mapping[int(i)])
+        sectors[j >> 8].add(j & 255)
+    quotas = (30, 30, 24, 30)
+    if any(len(sectors[g]) > quotas[g] for g in range(4)):
         return 'quota'
-    union = 0
-    for v in one:
-        union |= 1 << v
-        for bit in range(8):
-            union |= 1 << (v ^ (1<<bit))
-    if 9*len(one) - union.bit_count() > 20:
-        return 'collision'
-    fixed_mask = sum(1<<v for v in one)
+    for g in range(4):
+        union = 0
+        for v in sectors[g]:
+            union |= 1 << v
+            for bit in range(8):
+                union |= 1 << (v ^ (1 << bit))
+        collision = 9 * len(sectors[g]) - union.bit_count()
+        limit = 9 * quotas[g] + quotas[g ^ 1] + quotas[g ^ 2] - 256
+        if collision > limit:
+            return 'collision'
+        if collision + len(sectors[g ^ 1] & sectors[g ^ 2]) > limit:
+            return 'mixed_sector_overlap'
+    fixed_mask = sum(1 << v for v in sectors[2])
     if any(fixed_mask & cut == cut for cut in certs):
         return 'dual'
     return None
+
+def exact_lifted_star_lp_row(problem, center, external_position):
+    """One valid original-variable-order LP row <= 7; there are 256^2 rows."""
+    mapping, _ = _guard(problem)
+    if mapping is None:
+        return None
+    if not (0 <= center < 256 and 0 <= external_position < 256):
+        raise ValueError('center and external_position must be 8-bit indices')
+    canonical_to_original = np.argsort(mapping)
+    row = np.zeros(1024, dtype=float)
+    for j in [center] + [center ^ (1 << bit) for bit in range(8)]:
+        row[canonical_to_original[512 + j]] = 1.
+    row[canonical_to_original[external_position]] = 1.
+    row[canonical_to_original[768 + external_position]] = 1.
+    return row
 
 def reject_complete_candidate(problem, candidate):
     """Heuristic-only: do not infer that any surrounding radial node is impossible."""
