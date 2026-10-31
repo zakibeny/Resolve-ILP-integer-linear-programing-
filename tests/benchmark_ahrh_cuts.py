@@ -53,7 +53,19 @@ def main():
     assert _guard(problem)[0] is not None,'exact cuts did not activate on actual MPS'
     global_row=exact_13_lp_row(problem)
     assert global_row is not None and np.count_nonzero(global_row)==13
+    from ahrh_exact_pruners import exact_256_neighborhood_lp_rows
     from scipy.optimize import linprog as lp
+    from scipy import sparse
+    neighbor_cuts, neighbor_rhs = exact_256_neighborhood_lp_rows(problem)
+    assert neighbor_cuts is not None and neighbor_cuts.shape == (256,1024)
+    assert neighbor_cuts.nnz == 2304 and np.all(neighbor_rhs == 6)
+    # Native source-column order: maximize nine-center occupancy of row 0.
+    objective_row = np.asarray(neighbor_cuts.getrow(0).todense()).ravel()
+    lp_base = lp(-objective_row,A_ub=np.asarray(problem.A),b_ub=np.asarray(problem.b),bounds=(0,1),method='highs')
+    lp_cut = lp(-objective_row,A_ub=sparse.vstack((sparse.csr_matrix(problem.A),neighbor_cuts)),b_ub=np.r_[problem.b,neighbor_rhs],bounds=(0,1),method='highs')
+    assert lp_base.success and lp_cut.success
+    assert 6.3 < -lp_base.fun < 6.4, ('precut value',-lp_base.fun)
+    assert abs(-lp_cut.fun-6.) < 1e-6, ('postcut value',-lp_cut.fun)
     prev=lp(-global_row,A_ub=np.asarray(problem.A),b_ub=np.asarray(problem.b),bounds=(0,1),method='highs')
     assert prev.success and 12.40 < -prev.fun < 12.50,('original model LP max wrong',prev.message)
     after=lp(-global_row,A_ub=np.vstack((problem.A,global_row)),b_ub=np.r_[problem.b,12.0],bounds=(0,1),method='highs')
@@ -62,13 +74,14 @@ def main():
           'max_iterations':1,'max_active_nodes':1,'no_improvement_limit':1,
           'node_budget':1,'alpha_steps':3,'max_repair_steps':4}
     report={'mps_sha':digest,'corrected_mps_parse_seconds':round(parse_seconds,4),
-            'parser_fixed_RHS':True,'identical_correct_problem_for_all_runs':True,'limits':caps,'LP_13_max_before':float(-prev.fun),'LP_13_max_after':float(-after.fun),
+            'parser_fixed_RHS':True,'identical_correct_problem_for_all_runs':True,'limits':caps,'LP_13_max_before':float(-prev.fun),'LP_13_max_after':float(-after.fun),'LP_neighborhood_before':float(-lp_base.fun),'LP_neighborhood_after':float(-lp_cut.fun),
             'runs':[
                timed('original_solver_corrected_RHS',original,problem,caps),
                timed('patched_without_cuts',patched,problem,{**caps,'exact_supportcase30_pruning':False}),
                timed('patched_with_cuts',patched,problem,{**caps,'exact_supportcase30_pruning':True}),
                timed('patched_3x45000_quota_swaps',patched,problem,{**caps,'quota_swap_moves':45000,'quota_swap_restarts':3}),
-               timed('patched_with_exact_13_LP_cut',patched,problem,{**caps,'exact_supportcase30_lp_cut':True})],
+               timed('patched_with_exact_13_LP_cut',patched,problem,{**caps,'exact_supportcase30_lp_cut':True}),
+               timed('patched_with_exact_256_cuts',patched,problem,{**caps,'exact_supportcase30_256_cuts':True})],
             'scope':'full solver call with tight caps, NOT uncapped solution time'}
     Path('ahrh_benchmark_result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
     print('AHRH_BENCH_RESULT_JSON='+json.dumps(report,ensure_ascii=False,sort_keys=True))

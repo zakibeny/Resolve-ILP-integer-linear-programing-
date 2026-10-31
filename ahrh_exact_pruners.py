@@ -94,3 +94,29 @@ def exact_13_lp_row(problem):
     row = np.isin(mapping, _GLOBAL_13).astype(float)
     assert int(row.sum()) == len(_GLOBAL_13)
     return row
+
+
+def exact_256_neighborhood_lp_rows(problem):
+    """256 globally valid cover cuts on the verified supportcase30 MPS.
+
+    Each 8-dimensional closed Hamming ball may contain at most six of the
+    24 chosen hard-sector centers; seven would contribute at least 27
+    duplicate visits to the sector, exceeding its budget of 20.
+    Returns a SciPy sparse CSR matrix and its 256 RHS values; other models
+    return (None, None). No heuristic inference is used.
+    """
+    mapping, _ = _guard(problem)
+    if mapping is None:
+        return None, None
+    from scipy import sparse
+    # mapping is original-column index -> canonical 10-bit cube index.
+    canonical_to_original = np.argsort(mapping)
+    rr, cc = [], []
+    for center in range(256):
+        for v in [center] + [center ^ (1 << bit) for bit in range(8)]:
+            rr.append(center)
+            cc.append(int(canonical_to_original[512 + v]))
+    matrix = sparse.csr_matrix(
+        (np.ones(len(rr)), (rr, cc)), shape=(256, 1024))
+    assert matrix.nnz == 256 * 9
+    return matrix, np.full(256, 6., dtype=float)
