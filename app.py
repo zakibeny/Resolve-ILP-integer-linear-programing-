@@ -71,6 +71,7 @@ class SearchConfig:
     quota_swap_moves: int = 0
     quota_swap_restarts: int = 3
     exact_supportcase30_lp_cut: bool = False
+    exact_supportcase30_256_cuts: bool = False
 
 
 @dataclass
@@ -734,7 +735,7 @@ def load_mps_file(path: str) -> CanonicalProblem:
 # ============================================================
 # LP relaxation
 # ============================================================
-def solve_lp_relaxation(problem: CanonicalProblem, exact_13_cut: bool = False) -> Tuple[Optional[np.ndarray], Optional[float], str]:
+def solve_lp_relaxation(problem: CanonicalProblem, exact_13_cut: bool = False, exact_256_cuts: bool = False) -> Tuple[Optional[np.ndarray], Optional[float], str]:
     if linprog is None:
         return None, None, "scipy_not_available"
     c = np.array(problem.c, dtype=float)
@@ -747,6 +748,16 @@ def solve_lp_relaxation(problem: CanonicalProblem, exact_13_cut: bool = False) -
             if row is not None:
                 A_ub = np.vstack((A_ub, row))
                 b_ub = np.concatenate((b_ub, [12.0]))
+        except (ImportError, OSError, ValueError, AssertionError):
+            pass
+    if exact_256_cuts:
+        try:
+            from ahrh_exact_pruners import exact_256_neighborhood_lp_rows
+            cut_rows, cut_rhs = exact_256_neighborhood_lp_rows(problem)
+            if cut_rows is not None:
+                from scipy import sparse
+                A_ub = sparse.vstack((A_ub, cut_rows), format="csr")
+                b_ub = np.concatenate((b_ub, cut_rhs))
         except (ImportError, OSError, ValueError, AssertionError):
             pass
     bounds = []
@@ -1051,7 +1062,7 @@ def smart_ahrh_solve(problem: CanonicalProblem, cfg: SearchConfig, progress_call
     if cfg.prune_small_coeffs is not None:
         problem = prune_small_coefficients(problem, cfg.prune_small_coeffs)
 
-    lp_x, lp_obj, lp_status = solve_lp_relaxation(problem, exact_13_cut=cfg.exact_supportcase30_lp_cut)
+    lp_x, lp_obj, lp_status = solve_lp_relaxation(problem, exact_13_cut=cfg.exact_supportcase30_lp_cut, exact_256_cuts=cfg.exact_supportcase30_256_cuts)
     center = lp_x.copy() if lp_x is not None else np.array(problem.lower_bounds, dtype=float)
     incumbent = build_initial_solution(problem, lp_x, cfg)
     if not is_feasible(problem, incumbent, cfg.feasibility_tolerance):
@@ -1525,6 +1536,7 @@ with st.sidebar:
     initial_radius = st.slider("Initial radius", 0.2, 5.0, 1.0, 0.1)
     use_verified_q10_quota_repair = st.checkbox("Quota-preserving feasibility repair (verified supportcase30 only)", value=False)
     use_verified_q10_lp_cut = st.checkbox("Verified global 13-variable cover cut (supportcase30 only)", value=False)
+    use_verified_q10_256_cuts = st.checkbox("Verified 256 global 9-ball cover cuts (supportcase30 only)", value=False)
 
     st.header(t('sidebar_stop'))
     use_R = st.checkbox(t('use_R'), value=False)
@@ -1574,6 +1586,7 @@ with tab1:
                 quota_swap_moves=45000 if use_verified_q10_quota_repair else 0,
                 quota_swap_restarts=3,
                 exact_supportcase30_lp_cut=use_verified_q10_lp_cut,
+                exact_supportcase30_256_cuts=use_verified_q10_256_cuts,
                 # For stopping criteria, we'll use our own logic in callback
             )
             # Progress indicators
