@@ -51,6 +51,18 @@ def main():
     assert set(problem.b)=={-30.0,-24.0,30.0,24.0,-1.0},'RHS parsing broken'
     from ahrh_exact_pruners import _guard, exact_13_lp_row
     assert _guard(problem)[0] is not None,'exact cuts did not activate on actual MPS'
+    from ahrh_exact_pruners import explain_exclusion, exact_lifted_star_lp_row
+    map_back=np.argsort(_guard(problem)[0])
+    core=[0,1,2,4,8,16]
+    fixed6=[int(map_back[512+j]) for j in core]
+    assert explain_exclusion(problem,fixed6) is None
+    assert explain_exclusion(problem,fixed6+[int(map_back[0]),int(map_back[768])])=='mixed_sector_overlap'
+    assert explain_exclusion(problem,fixed6+[int(map_back[32])])=='collision'
+    lifted=exact_lifted_star_lp_row(problem,0,0)
+    assert int(np.sum(lifted))==11
+    # 6 hard centers and one externally overlapped center force 21>20
+    assert lifted[fixed6].sum()==6
+    assert lifted[int(map_back[0])]==1 and lifted[int(map_back[768])]==1
     global_row=exact_13_lp_row(problem)
     assert global_row is not None and np.count_nonzero(global_row)==13
     from ahrh_exact_pruners import exact_256_neighborhood_lp_rows
