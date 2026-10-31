@@ -1513,6 +1513,7 @@ with st.sidebar:
     node_budget = st.slider("Node budget", 2, 10, 4)
     no_improvement_limit = st.slider("No improvement limit", 2, 15, 5)
     initial_radius = st.slider("Initial radius", 0.2, 5.0, 1.0, 0.1)
+    use_verified_q10_quota_repair = st.checkbox("Quota-preserving feasibility repair (verified supportcase30 only)", value=False)
 
     st.header(t('sidebar_stop'))
     use_R = st.checkbox(t('use_R'), value=False)
@@ -1559,6 +1560,8 @@ with tab1:
                 no_improvement_limit=no_improvement_limit,
                 node_budget=node_budget,
                 initial_radius=initial_radius,
+                quota_swap_moves=45000 if use_verified_q10_quota_repair else 0,
+                quota_swap_restarts=3,
                 # For stopping criteria, we'll use our own logic in callback
             )
             # Progress indicators
