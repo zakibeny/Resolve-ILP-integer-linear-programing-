@@ -54,6 +54,7 @@ def main():
     global_row=exact_13_lp_row(problem)
     assert global_row is not None and np.count_nonzero(global_row)==13
     from ahrh_exact_pruners import exact_256_neighborhood_lp_rows
+    from scipy.optimize import linprog as lp
     from scipy import sparse
     neighbor_cuts, neighbor_rhs = exact_256_neighborhood_lp_rows(problem)
     assert neighbor_cuts is not None and neighbor_cuts.shape == (256,1024)
@@ -65,7 +66,6 @@ def main():
     assert lp_base.success and lp_cut.success
     assert 6.3 < -lp_base.fun < 6.4, ('precut value',-lp_base.fun)
     assert abs(-lp_cut.fun-6.) < 1e-6, ('postcut value',-lp_cut.fun)
-    from scipy.optimize import linprog as lp
     prev=lp(-global_row,A_ub=np.asarray(problem.A),b_ub=np.asarray(problem.b),bounds=(0,1),method='highs')
     assert prev.success and 12.40 < -prev.fun < 12.50,('original model LP max wrong',prev.message)
     after=lp(-global_row,A_ub=np.vstack((problem.A,global_row)),b_ub=np.r_[problem.b,12.0],bounds=(0,1),method='highs')
