@@ -7,7 +7,7 @@ from multiprocessing import get_context
 import numpy as np
 from scipy.optimize import linprog
 
-NEEDED=set('CanonicalProblem SearchConfig SolveResult SearchNode safe_float validate_problem prune_small_coefficients objective_value constraint_slacks is_feasible violation_measure clip_to_bounds load_problem load_mps_file solve_lp_relaxation round_mixed greedy_repair build_initial_solution random_direction lp_guided_directions layer_bounds alpha_max_for_bounds sample_candidate node_score radial_scan_node should_prune should_refine refine_node build_initial_nodes rank_nodes smart_ahrh_solve _ahrh_candidate_rank _ahrh_better ahrh_exact_branch_prune'.split())
+NEEDED=set('normalize CanonicalProblem SearchConfig SolveResult SearchNode safe_float validate_problem prune_small_coefficients objective_value constraint_slacks is_feasible violation_measure clip_to_bounds load_problem load_mps_file solve_lp_relaxation round_mixed greedy_repair build_initial_solution random_direction lp_guided_directions layer_bounds alpha_max_for_bounds sample_candidate node_score radial_scan_node should_prune should_refine refine_node build_initial_nodes rank_nodes smart_ahrh_solve _ahrh_candidate_rank _ahrh_better ahrh_exact_branch_prune'.split())
 def load_core(source):
     nodes=[n for n in ast.parse(source).body if isinstance(n,(ast.FunctionDef,ast.ClassDef)) and n.name in NEEDED]
     name='ahrh_benchmark_core'
