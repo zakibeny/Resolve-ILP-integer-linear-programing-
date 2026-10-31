@@ -67,7 +67,7 @@ class SearchConfig:
     max_repair_steps: int = 400
     feasibility_tolerance: float = 1e-7
     prune_small_coeffs: Optional[float] = None
-    exact_supportcase30_pruning: bool = True
+    exact_supportcase30_pruning: bool = False
 
 
 @dataclass
@@ -947,7 +947,7 @@ def radial_scan_node(
         alpha = a1 + t * (a2 - a1)
         cand = sample_candidate(center, node.direction, alpha)
         cand = greedy_repair(problem, cand, max_steps=cfg.max_repair_steps // 4)
-        if getattr(cfg, "exact_supportcase30_pruning", True):
+        if getattr(cfg, "exact_supportcase30_pruning", False):
             try:
                 from ahrh_exact_pruners import reject_complete_candidate
                 if reject_complete_candidate(problem, cand):
