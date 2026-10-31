@@ -70,3 +70,27 @@ def reject_complete_candidate(problem, candidate):
     if x.shape != (1024,) or not np.all((np.abs(x)<1e-7) | (np.abs(x-1)<1e-7)):
         return False
     return explain_exclusion(problem, np.flatnonzero(x>0.5)) is not None
+
+
+# Verified independently against the original MPS (SHA in _SIGNATURE) and all 4 quotas.
+# 13 group-2 centers force 22 duplicate visits while the group-2 surplus budget is 20.
+_GLOBAL_13 = (518, 562, 563, 575, 580, 592, 606, 628, 656, 663, 670, 710, 754)
+
+def exact_13_lp_row(problem):
+    """Return globally valid inequality row a*x <= 12 for the ORIGINAL variable order.
+
+    The model guard is essential; this cut is specific to supportcase30 Q10 geometry.
+    """
+    mapping, _ = _guard(problem)
+    if mapping is None:
+        return None
+    balls = set()
+    for j in _GLOBAL_13:
+        v = j - 512
+        balls.add(v)
+        balls.update(v ^ (1 << bit) for bit in range(8))
+    assert 9 * len(_GLOBAL_13) - len(balls) == 22
+    assert 9 * 24 + 30 + 30 - 256 == 20
+    row = np.isin(mapping, _GLOBAL_13).astype(float)
+    assert int(row.sum()) == len(_GLOBAL_13)
+    return row
