@@ -1521,7 +1521,7 @@ tab1, tab2 = st.tabs([t('tab_upload'), t('tab_manual')])
 with tab1:
     st.header(t('upload_header'))
     st.info(t('upload_info'))
-    uploaded_file = st.file_uploader(t('choose_file'), type=["mps", "lp", "json", "txt"])
+    uploaded_file = st.file_uploader(t('choose_file'), type=["mps", "lp", "json", "txt", "gz"])
     if uploaded_file is not None:
         # Save temporarily
         temp_path = f"/tmp/{uploaded_file.name}"
