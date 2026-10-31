@@ -59,7 +59,8 @@ def main():
             'runs':[
                timed('original_solver_corrected_RHS',original,problem,caps),
                timed('patched_without_cuts',patched,problem,{**caps,'exact_supportcase30_pruning':False}),
-               timed('patched_with_cuts',patched,problem,{**caps,'exact_supportcase30_pruning':True})],
+               timed('patched_with_cuts',patched,problem,{**caps,'exact_supportcase30_pruning':True}),
+               timed('patched_3x45000_quota_swaps',patched,problem,{**caps,'quota_swap_moves':45000,'quota_swap_restarts':3})],
             'scope':'full solver call with tight caps, NOT uncapped solution time'}
     Path('ahrh_benchmark_result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
     print('AHRH_BENCH_RESULT_JSON='+json.dumps(report,ensure_ascii=False,sort_keys=True))
