@@ -68,6 +68,8 @@ class SearchConfig:
     feasibility_tolerance: float = 1e-7
     prune_small_coeffs: Optional[float] = None
     exact_supportcase30_pruning: bool = False
+    quota_swap_moves: int = 0
+    quota_swap_restarts: int = 3
 
 
 @dataclass
@@ -825,8 +827,22 @@ def build_initial_solution(problem: CanonicalProblem, lp_x: Optional[np.ndarray]
         for i, t in enumerate(problem.variable_types):
             if t == "B":
                 x0[i] = 0.0
-        return greedy_repair(problem, x0, cfg.max_repair_steps)
-    return greedy_repair(problem, lp_x, cfg.max_repair_steps)
+        incumbent = greedy_repair(problem, x0, cfg.max_repair_steps)
+    else:
+        incumbent = greedy_repair(problem, lp_x, cfg.max_repair_steps)
+    if cfg.quota_swap_moves > 0:
+        try:
+            from ahrh_q10_quota_repair import verified_quota_repair
+            candidate = verified_quota_repair(
+                problem, lp_x,
+                moves=cfg.quota_swap_moves,
+                restarts=cfg.quota_swap_restarts,
+                seed=cfg.random_seed)
+            if candidate is not None and _ahrh_better(problem, candidate, incumbent, cfg.feasibility_tolerance):
+                incumbent = candidate
+        except (ImportError, OSError, ValueError, AssertionError):
+            pass
+    return incumbent
 
 
 # ============================================================
