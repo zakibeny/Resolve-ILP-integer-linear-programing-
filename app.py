@@ -67,6 +67,7 @@ class SearchConfig:
     max_repair_steps: int = 400
     feasibility_tolerance: float = 1e-7
     prune_small_coeffs: Optional[float] = None
+    exact_supportcase30_pruning: bool = True
 
 
 @dataclass
@@ -214,7 +215,7 @@ def prune_small_coefficients(problem: CanonicalProblem, threshold: float) -> Can
 def load_problem(path: str, fmt: Optional[str] = None) -> CanonicalProblem:
     if fmt is None:
         ext = os.path.splitext(path)[1].lower()
-        if ext == ".mps":
+        if ext == ".mps" or path.lower().endswith(".mps.gz"):
             fmt = "mps"
         elif ext == ".lp":
             fmt = "lp"
@@ -549,7 +550,9 @@ def load_lp_file(path: str) -> CanonicalProblem:
 
 
 def load_mps_file(path: str) -> CanonicalProblem:
-    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+    import gzip
+    opener = gzip.open if path.lower().endswith(".gz") else open
+    with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
         lines = [ln.rstrip("\n") for ln in f]
     section = None
     problem_name = os.path.basename(path)
@@ -566,7 +569,7 @@ def load_mps_file(path: str) -> CanonicalProblem:
         if not line or line.startswith("*"):
             continue
         head = line.split()[0].upper()
-        if head in ("NAME", "ROWS", "COLUMNS", "RHS", "BOUNDS", "RANGES", "ENDATA"):
+        if raw and not raw[0].isspace() and head in ("NAME", "ROWS", "COLUMNS", "RHS", "BOUNDS", "RANGES", "ENDATA"):
             section = head
             if head == "NAME":
                 toks = line.split()
@@ -901,6 +904,24 @@ def node_score(problem: CanonicalProblem, candidate: np.ndarray, incumbent: np.n
     return 0.7 * obj_hope + 0.3 * feas_hope
 
 
+def _ahrh_candidate_rank(problem, z, tol=1e-7):
+    """Feasibility-first: only compare objective values when both solutions are feasible."""
+    feasible = is_feasible(problem, z, tol)
+    if feasible:
+        return (1, -objective_value(problem, z), 0.0)
+    return (0, -violation_measure(problem, z), -objective_value(problem, z))
+
+def _ahrh_better(problem, candidate, previous, tol=1e-7):
+    return _ahrh_candidate_rank(problem, candidate, tol) > _ahrh_candidate_rank(problem, previous, tol)
+
+def ahrh_exact_branch_prune(problem, fixed_one_indices):
+    """Necessary condition for an ACTUAL fixed-ones branch, not a radial node."""
+    try:
+        from ahrh_exact_pruners import explain_exclusion
+        return explain_exclusion(problem, fixed_one_indices)
+    except (ImportError, OSError, ValueError, AssertionError):
+        return None
+
 def radial_scan_node(
     problem: CanonicalProblem,
     center: np.ndarray,
@@ -926,8 +947,15 @@ def radial_scan_node(
         alpha = a1 + t * (a2 - a1)
         cand = sample_candidate(center, node.direction, alpha)
         cand = greedy_repair(problem, cand, max_steps=cfg.max_repair_steps // 4)
+        if getattr(cfg, "exact_supportcase30_pruning", True):
+            try:
+                from ahrh_exact_pruners import reject_complete_candidate
+                if reject_complete_candidate(problem, cand):
+                    continue
+            except (ImportError, OSError, ValueError, AssertionError):
+                pass
         cand_obj = objective_value(problem, cand)
-        if is_feasible(problem, cand, cfg.feasibility_tolerance) and cand_obj < best_obj - 1e-12:
+        if _ahrh_better(problem, cand, best, cfg.feasibility_tolerance):
             best = cand
             best_obj = cand_obj
             improved = True
@@ -1019,7 +1047,7 @@ def smart_ahrh_solve(problem: CanonicalProblem, cfg: SearchConfig, progress_call
 
         # compute current gap
         if lp_obj is not None and lp_obj != float('inf'):
-            gap = (best_obj - lp_obj) / lp_obj * 100
+            gap = ((best_obj - lp_obj) / abs(lp_obj) * 100 if abs(lp_obj) > 1e-12 else (0.0 if is_feasible(problem, incumbent, cfg.feasibility_tolerance) and abs(best_obj - lp_obj) <= 1e-12 else float("nan")))
         else:
             gap = 0.0
         gap_history.append(gap)
@@ -1047,7 +1075,7 @@ def smart_ahrh_solve(problem: CanonicalProblem, cfg: SearchConfig, progress_call
             cand, cand_obj, improved = radial_scan_node(problem, center, incumbent, node, cfg)
             node.improved = improved
             node.budget -= 1
-            if improved and cand_obj < best_obj - 1e-12:
+            if improved and _ahrh_better(problem, cand, incumbent, cfg.feasibility_tolerance):
                 incumbent = cand
                 best_obj = cand_obj
                 improved_this_iter = True
