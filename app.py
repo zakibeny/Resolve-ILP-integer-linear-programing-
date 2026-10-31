@@ -675,7 +675,7 @@ def load_mps_file(path: str) -> CanonicalProblem:
             A.append([-v for v in row])
             b.append(-rhs)
 
-    names, vtypes, lbs, ubs, c2, A2 = [], [], [], [], [], [list(row) for row in A]
+    names, vtypes, lbs, ubs, c2, A2 = [], [], [], [], [], [[] for _ in A]
     obj_offset = 0.0
 
     def add_var(name: str, colvec: List[float], obj: float, vtype: str, lb: float, ub: Optional[float]):
