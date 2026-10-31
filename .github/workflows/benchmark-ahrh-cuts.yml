@@ -1,0 +1,37 @@
+name: Benchmark AHRH certified cuts
+on:
+  pull_request:
+    paths:
+      - "app.py"
+      - "ahrh_exact_pruners.py"
+      - "tests/benchmark_ahrh_cuts.py"
+      - ".github/workflows/benchmark-ahrh-cuts.yml"
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      PYTHONPATH: "."
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install benchmark libraries
+        run: python -m pip install numpy scipy
+      - name: Check patched Python syntax
+        run: python -m py_compile app.py ahrh_exact_pruners.py tests/benchmark_ahrh_cuts.py
+      - name: Compare actual source solvers on verified supportcase30
+        run: python tests/benchmark_ahrh_cuts.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ahrh-benchmark-json
+          path: ahrh_benchmark_result.json
+          if-no-files-found: ignore
